@@ -64,9 +64,8 @@ enum BrowserSupport {
         var unsupported: [UnsupportedBrowser] = []
         for url in NSWorkspace.shared.urlsForApplications(toOpen: sample) {
             guard let bundle = Bundle(url: url), let bundleID = bundle.bundleIdentifier,
-                  bundleID != LibraryLocation.bundleID, seen.insert(bundleID).inserted,
-                  // Skip copies inside other apps, caches and build folders.
-                  !url.path.contains(".app/Contents/"), !url.path.contains("/Library/Caches/"),
+                  bundleID != LibraryLocation.bundleID,
+                  isInstalledLocation(url), seen.insert(bundleID).inserted,
                   // Link routers like Finicky run in the background and never show pages themselves.
                   !isBackgroundOnly(bundle)
             else { continue }
@@ -96,6 +95,23 @@ enum BrowserSupport {
             return nil
         }
         return Browser(bundleID: bundleID, name: displayName(of: appURL), dialect: dialect, appURL: appURL)
+    }
+
+    /// Folders where people install apps. Other registered copies are usually automation browsers
+    /// bundled by developer tools (Windsurf, Playwright, Puppeteer) or apps nested inside other apps.
+    private static let applicationFolders: [String] = [
+        "/Applications/",
+        "/System/Applications/",
+        // Safari ships in a cryptex on macOS 13 and later.
+        "/System/Volumes/Preboot/Cryptexes/App/System/Applications/",
+        "/System/Cryptexes/App/System/Applications/",
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications").path + "/",
+    ]
+
+    private static func isInstalledLocation(_ url: URL) -> Bool {
+        let path = url.standardizedFileURL.path
+        guard !path.contains(".app/Contents/") else { return false }
+        return applicationFolders.contains { path.hasPrefix($0) }
     }
 
     private static func isBackgroundOnly(_ bundle: Bundle) -> Bool {
