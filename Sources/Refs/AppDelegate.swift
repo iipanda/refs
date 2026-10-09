@@ -144,6 +144,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     @objc private func captureWindowAction() { startCapture(.window) }
     @objc private func openLibraryAction() { showLibrary() }
     @objc private func openSettingsAction() { showSettings() }
+
+    /// Selects text while editing, otherwise every visible card in the Library.
+    @objc private func selectAllAction() {
+        let window = NSApp.keyWindow
+        if window === libraryWindow, !(window?.firstResponder is NSText) {
+            library.selectAllVisible()
+        } else {
+            NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil)
+        }
+    }
     @objc private func openOnboardingAction() { showOnboarding() }
 
     @objc private func openRecent(_ sender: NSMenuItem) {
@@ -185,7 +195,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
         editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
         editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editMenu.addItem(item("Select All", #selector(selectAllAction), nil, key: "a"))
 
         let windowMenu = NSMenu(title: "Window")
         windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
@@ -408,6 +418,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             window.orderFront(nil)
             return (window, width)
         }
+        let bulk = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 320, height: 520),
+                            styleMask: [.titled], backing: .buffered, defer: false)
+        bulk.contentView = NSHostingView(rootView: BulkInspectorView(model: library, refs: Array(library.refs.prefix(3)))
+            .frame(width: 320, height: 520)
+            .background(Color(nsColor: .windowBackgroundColor)))
+        bulk.orderFront(nil)
         // A window whose width changes after layout, like when the details panel opens or closes.
         let resized = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1000, height: 760),
                                styleMask: [.titled, .resizable], backing: .buffered, defer: false)
@@ -423,6 +439,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [self] in
             for (window, width) in gridWindows { write(window, "grid-\(width).png") }
             write(resized, "grid-resized-700.png")
+            write(bulk, "bulk-inspector.png")
             write(libraryWindow, "library.png")
             write(settingsWindow, "settings.png")
             write(onboardingWindow, "onboarding.png")

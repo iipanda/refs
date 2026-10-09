@@ -23,11 +23,15 @@ struct LibraryView: View {
             grid
                 // The details panel only exists while something is selected.
                 .inspector(isPresented: inspectorPresented) {
-                    if let ref = model.reference(id: model.selectedID) {
-                        InspectorView(model: model, ref: ref)
-                            .id(ref.id)
-                            .inspectorColumnWidth(min: 280, ideal: 320, max: 420)
+                    Group {
+                        if let ref = model.reference(id: model.selectedID) {
+                            InspectorView(model: model, ref: ref)
+                                .id(ref.id)
+                        } else if model.selection.count > 1 {
+                            BulkInspectorView(model: model, refs: model.selectedRefs)
+                        }
                     }
+                    .inspectorColumnWidth(min: 280, ideal: 320, max: 420)
                 }
         }
         .searchable(text: $search, placement: .toolbar, prompt: "Search notes, sites, apps")
@@ -40,28 +44,49 @@ struct LibraryView: View {
             }
         }
         .frame(minWidth: 700, minHeight: 520)
-        .onChange(of: sidebar) { deselectIfHidden() }
-        .onChange(of: search) { deselectIfHidden() }
+        .onChange(of: visibleRefs.map(\.id), initial: true) { _, ids in
+            model.visibleIDs = ids
+            // Switching sections or searching drops selected cards that are no longer shown.
+            model.selection.retain(ids)
+        }
+        .confirmationDialog(deletionTitle, isPresented: deletionPresented) {
+            Button("Delete", role: .destructive) {
+                model.delete(ids: Set(model.pendingDeletion.map(\.id)))
+                model.pendingDeletion = []
+            }
+        } message: {
+            Text(model.pendingDeletion.count == 1
+                 ? "The screenshot and its note are removed from the library."
+                 : "The screenshots and their notes are removed from the library.")
+        }
     }
 
     private var inspectorPresented: Binding<Bool> {
         Binding(
-            get: { model.reference(id: model.selectedID) != nil },
-            set: { if !$0 { model.selectedID = nil } }
+            get: { !model.selection.isEmpty },
+            set: { if !$0 { model.selection.clear() } }
         )
     }
 
-    private func deselectIfHidden() {
-        if let id = model.selectedID, !visibleRefs.contains(where: { $0.id == id }) {
-            model.selectedID = nil
-        }
+    private var deletionPresented: Binding<Bool> {
+        Binding(
+            get: { !model.pendingDeletion.isEmpty },
+            set: { if !$0 { model.pendingDeletion = [] } }
+        )
     }
 
-    /// Single click selects, clicking the selected card again deselects. The second click of a
-    /// double-click is ignored so opening an image doesn't also deselect it.
-    private func toggleSelection(_ ref: Reference) {
+    private var deletionTitle: String {
+        let count = model.pendingDeletion.count
+        return count == 1 ? "Delete this reference?" : "Delete \(count) references?"
+    }
+
+    /// Click selects one card (or clears it if it was the only one), ⌘-click toggles, ⇧-click selects a
+    /// range. The second click of a double-click is ignored so opening an image doesn't change the selection.
+    private func handleClick(_ ref: Reference) {
         guard (NSApp.currentEvent?.clickCount ?? 1) <= 1 else { return }
-        model.selectedID = model.selectedID == ref.id ? nil : ref.id
+        let flags = NSEvent.modifierFlags
+        let modifier: Selection.Modifier = flags.contains(.command) ? .toggle : flags.contains(.shift) ? .extend : .none
+        model.selection.click(ref.id, modifier: modifier, order: model.visibleIDs)
     }
 
     // MARK: Sidebar
@@ -124,8 +149,8 @@ struct LibraryView: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ReferenceGrid(model: model, refs: refs, onToggle: toggleSelection, contextMenu: contextMenu)
-                .onExitCommand { model.selectedID = nil }
+                ReferenceGrid(model: model, refs: refs, onClick: handleClick, contextMenu: contextMenu)
+                .onExitCommand { model.selection.clear() }
             }
         }
         .navigationTitle(title)
@@ -163,11 +188,18 @@ struct LibraryView: View {
 
     @ViewBuilder
     private func contextMenuItems(for ref: Reference) -> some View {
-        Button("Open") { NSWorkspace.shared.open(model.imageURL(for: ref)) }
-        Button("Copy Reference") { copy(model.referenceText(for: ref)) }
-        Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([model.imageURL(for: ref)]) }
+        // Right-clicking a card that's part of a multi-selection acts on the whole selection.
+        let targets = model.selection.contains(ref.id) && model.selection.count > 1 ? model.selectedRefs : [ref]
+        let suffix = targets.count > 1 ? " \(targets.count) References" : " Reference"
+        Button(targets.count > 1 ? "Open \(targets.count) Images" : "Open") {
+            targets.forEach { NSWorkspace.shared.open(model.imageURL(for: $0)) }
+        }
+        Button("Copy" + suffix) { copy(model.referenceText(for: targets)) }
+        Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting(targets.map(model.imageURL(for:))) }
         Divider()
-        Button("Delete", role: .destructive) { model.delete(id: ref.id) }
+        Button("Delete" + (targets.count > 1 ? " \(targets.count) References…" : "…"), role: .destructive) {
+            model.requestDeletion(of: targets)
+        }
     }
 }
 
@@ -175,7 +207,8 @@ struct LibraryView: View {
 struct ReferenceGrid: View {
     @ObservedObject var model: LibraryModel
     let refs: [Reference]
-    var onToggle: (Reference) -> Void = { _ in }
+    var onClick: (Reference) -> Void = { _ in }
+    @FocusState private var focused: Bool
     var contextMenu: (Reference) -> AnyView = { _ in AnyView(EmptyView()) }
 
     static let padding: CGFloat = 16
@@ -200,14 +233,17 @@ struct ReferenceGrid: View {
                           alignment: .leading, spacing: 18) {
                     ForEach(refs) { ref in
                         ReferenceCard(ref: ref, imageURL: model.imageURL(for: ref),
-                                      selected: model.selectedID == ref.id,
+                                      selected: model.selection.contains(ref.id),
                                       favicon: { model.favicons[$0] })
                             .frame(width: layout.cardWidth)
                             .onTapGesture(count: 2) {
-                                model.selectedID = ref.id
+                                model.selection.select(ref.id)
                                 NSWorkspace.shared.open(model.imageURL(for: ref))
                             }
-                            .simultaneousGesture(TapGesture().onEnded { onToggle(ref) })
+                            .simultaneousGesture(TapGesture().onEnded {
+                                focused = true
+                                onClick(ref)
+                            })
                             .contextMenu { contextMenu(ref) }
                     }
                 }
@@ -219,9 +255,21 @@ struct ReferenceGrid: View {
                     // Behind the cards, so it only receives clicks on empty space.
                     Color.clear
                         .contentShape(Rectangle())
-                        .onTapGesture { model.selectedID = nil }
+                        .onTapGesture {
+                            focused = true
+                            model.selection.clear()
+                        }
                 }
             }
+        }
+        // Focusable so ⌫ deletes the selection; ⌘A comes through Edit › Select All.
+        .focusable()
+        .focusEffectDisabled()
+        .focused($focused)
+        .onKeyPress(keys: [.delete, .deleteForward]) { _ in
+            guard !model.selection.isEmpty else { return .ignored }
+            model.requestDeletion(of: model.selectedRefs)
+            return .handled
         }
     }
 }
@@ -281,7 +329,6 @@ struct InspectorView: View {
     let ref: Reference
     @State private var note: String
     @State private var image: NSImage?
-    @State private var confirmingDelete = false
 
     init(model: LibraryModel, ref: Reference) {
         self.model = model
@@ -346,7 +393,7 @@ struct InspectorView: View {
                         .help("Copy the id, source, note and file path, for pasting into an agent prompt")
                     Button("Reveal") { NSWorkspace.shared.activateFileViewerSelecting([model.imageURL(for: ref)]) }
                     Spacer(minLength: 8)
-                    Button("Delete", role: .destructive) { confirmingDelete = true }
+                    Button("Delete", role: .destructive) { model.requestDeletion(of: [ref]) }
                 }
                 .controlSize(.small)
             }
@@ -355,11 +402,6 @@ struct InspectorView: View {
         .task(id: ref.id) {
             image = await Thumbnails.load(model.imageURL(for: ref), maxPixelSize: 1200)
         }
-        .confirmationDialog("Delete this reference?", isPresented: $confirmingDelete) {
-            Button("Delete", role: .destructive) { model.delete(id: ref.id) }
-        } message: {
-            Text("The screenshot and its note are removed from the library.")
-        }
     }
 
     private func row<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
@@ -367,6 +409,79 @@ struct InspectorView: View {
             Text(label).foregroundStyle(.secondary).gridColumnAlignment(.trailing)
             content()
         }
+    }
+}
+
+/// Shown in place of the details when several references are selected.
+struct BulkInspectorView: View {
+    @ObservedObject var model: LibraryModel
+    let refs: [Reference]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            ZStack {
+                ForEach(Array(refs.prefix(3).enumerated().reversed()), id: \.element.id) { index, ref in
+                    StackedThumbnail(url: model.imageURL(for: ref))
+                        .rotationEffect(.degrees(Double(index) * -4))
+                        .offset(x: CGFloat(index) * -10, y: CGFloat(index) * -6)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 170)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(refs.count) references selected")
+                    .font(.headline)
+                Text(sources)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(3)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Button("Copy \(refs.count) References") { copy(model.referenceText(for: refs)) }
+                    .help("Copy ids, sources, notes and file paths, for pasting into an agent prompt")
+                Button("Reveal in Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting(refs.map(model.imageURL(for:)))
+                }
+                Button("Deselect All") { model.selection.clear() }
+            }
+            .controlSize(.small)
+
+            Spacer()
+
+            Button("Delete \(refs.count) References…", role: .destructive) { model.requestDeletion(of: refs) }
+                .controlSize(.small)
+        }
+        .padding(16)
+    }
+
+    /// e.g. "stripe.com, Linear and 2 more".
+    private var sources: String {
+        var seen = Set<String>()
+        let names = refs.map(\.sourceLabel).filter { seen.insert($0).inserted }
+        guard names.count > 3 else { return ListFormatter.localizedString(byJoining: names) }
+        return names.prefix(3).joined(separator: ", ") + " and \(names.count - 3) more"
+    }
+}
+
+private struct StackedThumbnail: View {
+    let url: URL
+    @State private var image: NSImage?
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 8)
+            .fill(.quaternary)
+            .frame(width: 200, height: 130)
+            .overlay(alignment: .topLeading) {
+                if let image {
+                    Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.15), lineWidth: 0.5))
+            .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
+            .task(id: url) { image = await Thumbnails.load(url, maxPixelSize: 520) }
     }
 }
 

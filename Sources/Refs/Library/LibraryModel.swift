@@ -4,7 +4,24 @@ import RefsCore
 /// The app's in-memory view of the library folder.
 final class LibraryModel: ObservableObject {
     @Published private(set) var refs: [Reference] = []
-    @Published var selectedID: String?
+    @Published var selection = Selection()
+    /// IDs of the cards currently shown, in grid order. Set by the Library view; used for ⇧-click
+    /// ranges and Select All.
+    var visibleIDs: [String] = []
+    /// References waiting for the user to confirm deletion.
+    @Published var pendingDeletion: [Reference] = []
+
+    /// The selected reference ID when exactly one is selected.
+    var selectedID: String? {
+        get { selection.single }
+        set {
+            if let newValue { selection.select(newValue) } else { selection.clear() }
+        }
+    }
+
+    var selectedRefs: [Reference] {
+        selection.ordered(by: visibleIDs).compactMap { reference(id: $0) }
+    }
     /// Website icons by host, loaded from the library's icon cache.
     @Published private(set) var favicons: [String: NSImage] = [:]
     private(set) var store: LibraryStore
@@ -21,7 +38,7 @@ final class LibraryModel: ObservableObject {
         store = LibraryStore(root: root)
         faviconCache = FaviconCache(libraryRoot: root)
         favicons = [:]
-        selectedID = nil
+        selection.clear()
         reload()
     }
 
@@ -87,9 +104,23 @@ final class LibraryModel: ObservableObject {
     }
 
     func delete(id: String) {
-        try? store.delete(id: id)
-        refs.removeAll { $0.id == id }
-        if selectedID == id { selectedID = nil }
+        delete(ids: [id])
+    }
+
+    func delete(ids: Set<String>) {
+        for id in ids { try? store.delete(id: id) }
+        refs.removeAll { ids.contains($0.id) }
+        selection.retain(refs.map(\.id))
+    }
+
+    /// Asks the Library view to confirm deleting these references.
+    func requestDeletion(of refs: [Reference]) {
+        guard !refs.isEmpty else { return }
+        pendingDeletion = refs
+    }
+
+    func selectAllVisible() {
+        selection.selectAll(visibleIDs)
     }
 
     func imageURL(for ref: Reference) -> URL {
@@ -109,6 +140,10 @@ final class LibraryModel: ObservableObject {
         if !ref.note.isEmpty { parts.append("what I like: \(ref.note)") }
         parts.append("image: \(imageURL(for: ref).path)")
         return parts.joined(separator: "\n")
+    }
+
+    func referenceText(for refs: [Reference]) -> String {
+        refs.map(referenceText(for:)).joined(separator: "\n\n")
     }
 }
 
