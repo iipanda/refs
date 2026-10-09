@@ -312,7 +312,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             view.cacheDisplay(in: view.bounds, to: rep)
             try? rep.representation(using: .png, properties: [:])?.write(to: dir.appendingPathComponent(name))
         }
-        library.selectedID = library.refs.first?.id
+        let selectFirst = ProcessInfo.processInfo.environment["REFS_SNAPSHOT_SELECT"] != "0"
+        library.selectedID = selectFirst ? library.refs.first?.id : nil
         showLibrary()
         showSettings()
         showOnboarding()

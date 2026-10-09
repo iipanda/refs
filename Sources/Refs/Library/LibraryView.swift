@@ -18,21 +18,41 @@ struct LibraryView: View {
         NavigationSplitView {
             sidebarList
                 .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
-        } content: {
-            grid
-                .navigationSplitViewColumnWidth(min: 360, ideal: 560)
         } detail: {
-            if let ref = model.reference(id: model.selectedID) {
-                InspectorView(model: model, ref: ref)
-                    .id(ref.id)
-            } else {
-                Text("Select a reference")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
+            grid
+                // The details panel only exists while something is selected.
+                .inspector(isPresented: inspectorPresented) {
+                    if let ref = model.reference(id: model.selectedID) {
+                        InspectorView(model: model, ref: ref)
+                            .id(ref.id)
+                            .inspectorColumnWidth(min: 280, ideal: 320, max: 420)
+                    }
+                }
         }
         .searchable(text: $search, placement: .toolbar, prompt: "Search notes, sites, apps")
-        .frame(minWidth: 900, minHeight: 520)
+        .frame(minWidth: 700, minHeight: 520)
+        .onChange(of: sidebar) { deselectIfHidden() }
+        .onChange(of: search) { deselectIfHidden() }
+    }
+
+    private var inspectorPresented: Binding<Bool> {
+        Binding(
+            get: { model.reference(id: model.selectedID) != nil },
+            set: { if !$0 { model.selectedID = nil } }
+        )
+    }
+
+    private func deselectIfHidden() {
+        if let id = model.selectedID, !visibleRefs.contains(where: { $0.id == id }) {
+            model.selectedID = nil
+        }
+    }
+
+    /// Single click selects, clicking the selected card again deselects. The second click of a
+    /// double-click is ignored so opening an image doesn't also deselect it.
+    private func toggleSelection(_ ref: Reference) {
+        guard (NSApp.currentEvent?.clickCount ?? 1) <= 1 else { return }
+        model.selectedID = model.selectedID == ref.id ? nil : ref.id
     }
 
     // MARK: Sidebar
@@ -95,19 +115,33 @@ struct LibraryView: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 170, maximum: 260), spacing: 16)], spacing: 18) {
-                        ForEach(refs) { ref in
-                            ReferenceCard(ref: ref, imageURL: model.imageURL(for: ref),
-                                          selected: model.selectedID == ref.id,
-                                          favicon: { model.favicons[$0] })
-                                .onTapGesture(count: 2) { NSWorkspace.shared.open(model.imageURL(for: ref)) }
-                                .simultaneousGesture(TapGesture().onEnded { model.selectedID = ref.id })
-                                .contextMenu { contextMenu(for: ref) }
+                GeometryReader { viewport in
+                    ScrollView {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 170, maximum: 260), spacing: 16)], spacing: 18) {
+                            ForEach(refs) { ref in
+                                ReferenceCard(ref: ref, imageURL: model.imageURL(for: ref),
+                                              selected: model.selectedID == ref.id,
+                                              favicon: { model.favicons[$0] })
+                                    .onTapGesture(count: 2) {
+                                        model.selectedID = ref.id
+                                        NSWorkspace.shared.open(model.imageURL(for: ref))
+                                    }
+                                    .simultaneousGesture(TapGesture().onEnded { toggleSelection(ref) })
+                                    .contextMenu { contextMenu(for: ref) }
+                            }
+                        }
+                        .padding(16)
+                        // Fill the viewport so clicks below the last row land on the background.
+                        .frame(maxWidth: .infinity, minHeight: viewport.size.height, alignment: .top)
+                        .background {
+                            // Behind the cards, so it only receives clicks on empty space.
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .onTapGesture { model.selectedID = nil }
                         }
                     }
-                    .padding(16)
                 }
+                .onExitCommand { model.selectedID = nil }
             }
         }
         .navigationTitle(title)
@@ -273,7 +307,6 @@ struct InspectorView: View {
             }
             .padding(16)
         }
-        .navigationSplitViewColumnWidth(min: 280, ideal: 320, max: 420)
         .task(id: ref.id) {
             image = await Thumbnails.load(model.imageURL(for: ref), maxPixelSize: 1200)
         }
