@@ -35,12 +35,23 @@ enum BrowserSupport {
 
     // MARK: - Detection
 
+    /// Apps that technically are browsers (they open web links and embed Chromium with tab
+    /// scripting) but that people use as something else. They're treated as ordinary apps.
+    static let notBrowsers: Set<String> = [
+        "com.openai.codex", // ChatGPT desktop app
+        "com.openai.chat", // ChatGPT desktop app, older builds
+    ]
+
+    static func isExcluded(_ bundleID: String) -> Bool {
+        notBrowsers.contains(bundleID)
+    }
+
     private static let lock = NSLock()
     private static var cache: [String: Browser?] = [:]
 
     /// The scriptable browser with this bundle ID, if it is one. Results are cached.
     static func browser(bundleID: String?) -> Browser? {
-        guard let bundleID else { return nil }
+        guard let bundleID, !isExcluded(bundleID) else { return nil }
         lock.lock()
         if let cached = cache[bundleID] {
             lock.unlock()
@@ -64,7 +75,7 @@ enum BrowserSupport {
         var unsupported: [UnsupportedBrowser] = []
         for url in NSWorkspace.shared.urlsForApplications(toOpen: sample) {
             guard let bundle = Bundle(url: url), let bundleID = bundle.bundleIdentifier,
-                  bundleID != LibraryLocation.bundleID,
+                  bundleID != LibraryLocation.bundleID, !isExcluded(bundleID),
                   isInstalledLocation(url), seen.insert(bundleID).inserted,
                   // Link routers like Finicky run in the background and never show pages themselves.
                   !isBackgroundOnly(bundle)

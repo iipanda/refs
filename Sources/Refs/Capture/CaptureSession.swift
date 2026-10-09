@@ -35,7 +35,7 @@ enum BrowserAccess: Equatable {
             default: return nil
             }
         }
-        if let bundleID = app.bundleID,
+        if let bundleID = app.bundleID, !BrowserSupport.isExcluded(bundleID),
            let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID),
            let sample = URL(string: "https://example.com"),
            NSWorkspace.shared.urlsForApplications(toOpen: sample).contains(appURL) {
