@@ -157,17 +157,19 @@ struct ReferenceCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ZStack {
-                Rectangle().fill(.quaternary.opacity(0.6))
-                if let image {
-                    Image(nsImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
+            // The thumbnail sits in an overlay so its fill size can't widen the card past its column.
+            Rectangle()
+                .fill(.quaternary.opacity(0.6))
+                .frame(maxWidth: .infinity)
+                .frame(height: 118)
+                .overlay(alignment: .topLeading) {
+                    if let image {
+                        Image(nsImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    }
                 }
-            }
-            .frame(height: 118)
-            .frame(maxWidth: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
                     .strokeBorder(selected ? Color.accentColor : Color.primary.opacity(0.12), lineWidth: selected ? 3 : 0.5)
