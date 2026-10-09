@@ -34,6 +34,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NotificationCenter.default.publisher(for: .refsShortcutsChanged).receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.registerHotKeys() }.store(in: &cancellables)
 
+        #if DEBUG
+        if let dir = ProcessInfo.processInfo.environment["REFS_SNAPSHOT_DIR"] {
+            snapshotWindows(to: URL(fileURLWithPath: dir))
+            return
+        }
+        #endif
+
         // Opening the app with both icons hidden would otherwise show nothing at all.
         if !preferences.showMenuBarIcon && !preferences.showDockIcon {
             showSettings()
@@ -276,4 +283,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow?.makeKeyAndOrderFront(nil)
     }
+
+    #if DEBUG
+    /// Renders the main windows to PNGs for visual checks without Screen Recording permission.
+    private func snapshotWindows(to dir: URL) {
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        func write(_ window: NSWindow?, _ name: String) {
+            guard let view = window?.contentView?.superview ?? window?.contentView,
+                  let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
+            view.cacheDisplay(in: view.bounds, to: rep)
+            try? rep.representation(using: .png, properties: [:])?.write(to: dir.appendingPathComponent(name))
+        }
+        library.selectedID = library.refs.first?.id
+        showLibrary()
+        showSettings()
+        if let ref = library.refs.first,
+           let image = ImageCoding.thumbnail(at: library.imageURL(for: ref), maxPixelSize: 4096) {
+            let capture = CaptureResult(
+                image: image, scale: 2, app: ref.app, windowTitle: ref.windowTitle, web: ref.web,
+                browserNeedingPermission: BrowserSupport.known[2],
+                frame: NSRect(x: 100, y: 200, width: 600, height: 300), sourceWindow: nil,
+                sourceWindowIsFrontmostOfApp: false)
+            let panel = SavePanelController(capture: capture) { _ in }
+            savePanel = panel
+            panel.show()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [self] in
+            write(libraryWindow, "library.png")
+            write(settingsWindow, "settings.png")
+            write(NSApp.windows.first { $0 is NSPanel && $0.isVisible }, "save-panel.png")
+            NSApp.terminate(nil)
+        }
+    }
+    #endif
 }

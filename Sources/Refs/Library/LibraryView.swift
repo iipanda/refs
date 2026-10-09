@@ -228,13 +228,16 @@ struct InspectorView: View {
                     }
                     if let web = ref.web, let url = URL(string: web.url) {
                         row("URL") {
-                            Link(web.url.replacingOccurrences(of: "https://", with: ""), destination: url)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
+                            Link(destination: url) {
+                                Text(verbatim: web.url.replacingOccurrences(of: "https://", with: ""))
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                            }
+                            .help(web.url)
                         }
                     }
                     row("Captured") {
-                        Text("\(ref.createdAt.formatted(date: .abbreviated, time: .shortened)) · \(ref.pixelWidth) × \(ref.pixelHeight)")
+                        Text(verbatim: "\(ref.createdAt.formatted(date: .abbreviated, time: .shortened)) · \(ref.pixelWidth) × \(ref.pixelHeight) px")
                     }
                 }
                 .font(.callout)
@@ -253,14 +256,16 @@ struct InspectorView: View {
 
                 HStack {
                     Button("Copy Reference") { copy(model.referenceText(for: ref)) }
+                        .help("Copy the id, source, note and file path, for pasting into an agent prompt")
                     Button("Reveal") { NSWorkspace.shared.activateFileViewerSelecting([model.imageURL(for: ref)]) }
-                    Spacer()
+                    Spacer(minLength: 8)
                     Button("Delete", role: .destructive) { confirmingDelete = true }
                 }
+                .controlSize(.small)
             }
             .padding(16)
         }
-        .frame(minWidth: 260)
+        .navigationSplitViewColumnWidth(min: 280, ideal: 320, max: 420)
         .task(id: ref.id) {
             image = await Thumbnails.load(model.imageURL(for: ref), maxPixelSize: 1200)
         }

@@ -102,8 +102,12 @@ final class Preferences: ObservableObject {
         }
     }
 
+    /// Same resolution order as the MCP helper: `REFS_LIBRARY`, then the chosen folder, then the default.
     var libraryURL: URL {
-        libraryPath.map { URL(fileURLWithPath: $0, isDirectory: true) } ?? LibraryLocation.defaultURL
+        if let override = ProcessInfo.processInfo.environment[LibraryLocation.environmentKey], !override.isEmpty {
+            return URL(fileURLWithPath: (override as NSString).expandingTildeInPath, isDirectory: true)
+        }
+        return libraryPath.map { URL(fileURLWithPath: $0, isDirectory: true) } ?? LibraryLocation.defaultURL
     }
 
     /// A shortcut that was cleared is stored as an empty Data so it doesn't fall back to the default.
