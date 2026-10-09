@@ -50,7 +50,9 @@ private struct GeneralTab: View {
 
             Section {
                 Toggle("Show in menu bar", isOn: $preferences.showMenuBarIcon)
-                Toggle("Show in Dock", isOn: $preferences.showDockIcon)
+                Picker("Show in Dock", selection: $preferences.dockIconMode) {
+                    ForEach(DockIconMode.allCases) { Text($0.title).tag($0) }
+                }
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, enabled in setLaunchAtLogin(enabled) }
             } footer: {

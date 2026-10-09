@@ -81,7 +81,8 @@ final class CaptureSession {
             overlays.append(overlay)
             overlay.orderFrontRegardless()
         }
-        NSApp.activate(ignoringOtherApps: true)
+        // The overlay takes keyboard focus without activating Refs. Activating would bring the Library
+        // and other Refs windows in front of the app being captured.
         let mouse = NSEvent.mouseLocation
         let keyOverlay = overlays.first { $0.frame.contains(mouse) } ?? overlays.first
         keyOverlay?.makeKey()

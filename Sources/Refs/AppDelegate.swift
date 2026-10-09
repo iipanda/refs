@@ -3,13 +3,15 @@ import Combine
 import RefsCore
 import SwiftUI
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDelegate {
     private let preferences = Preferences.shared
     private let hotKeyStatus = HotKeyStatus()
     private lazy var library = LibraryModel(root: preferences.libraryURL)
 
     private var statusItem: NSStatusItem?
     private var libraryWindow: NSWindow?
+    /// Whether the Library window is open (it may be minimised), which decides the Dock icon.
+    private var libraryOpen = false
     private var settingsWindow: NSWindow?
     private var onboardingWindow: NSWindow?
     private let browserPermissions = BrowserPermissionsModel()
@@ -27,7 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         preferences.$showMenuBarIcon.dropFirst().receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.applyStatusItem() }.store(in: &cancellables)
-        preferences.$showDockIcon.dropFirst().receive(on: RunLoop.main)
+        preferences.$dockIconMode.dropFirst().receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.applyDockPolicy() }.store(in: &cancellables)
         preferences.$libraryPath.dropFirst().receive(on: RunLoop.main)
             .sink { [weak self] _ in
@@ -46,7 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         if !preferences.onboardingCompleted {
             showOnboarding()
-        } else if !preferences.showMenuBarIcon && !preferences.showDockIcon {
+        } else if !preferences.showMenuBarIcon && preferences.dockIconMode != .always {
             // Opening the app with both icons hidden would otherwise show nothing at all.
             showSettings()
         }
@@ -171,10 +173,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func applyDockPolicy() {
-        NSApp.setActivationPolicy(preferences.showDockIcon ? .regular : .accessory)
-        if preferences.showDockIcon {
-            NSApp.activate(ignoringOtherApps: true)
+        let showIcon = switch preferences.dockIconMode {
+        case .always: true
+        case .whileLibraryOpen: libraryOpen
+        case .never: false
         }
+        let policy: NSApplication.ActivationPolicy = showIcon ? .regular : .accessory
+        if NSApp.activationPolicy() != policy {
+            NSApp.setActivationPolicy(policy)
+        }
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        guard (notification.object as? NSWindow) === libraryWindow else { return }
+        libraryOpen = false
+        applyDockPolicy()
     }
 
     // MARK: - Capture
@@ -226,12 +239,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    /// Hands focus back to the app the user was in, unless one of our windows is in use.
+    /// Capturing never activates Refs, so the app being captured normally stays in front. If something
+    /// did activate us meanwhile (an error alert, a permission prompt), hand focus back to that app.
     private func restoreFocus() {
         defer { previousApp = nil }
-        let ourWindowsVisible = [libraryWindow, settingsWindow, onboardingWindow].contains { $0?.isVisible == true }
-        guard !ourWindowsVisible else { return }
-        previousApp?.activate()
+        guard NSApp.isActive, let previousApp else { return }
+        previousApp.activate()
     }
 
     private func showError(_ title: String, _ message: String) {
@@ -254,12 +267,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             window.isReleasedWhenClosed = false
             window.setFrameAutosaveName("RefsLibrary")
             window.contentViewController = NSHostingController(rootView: LibraryView(model: library, preferences: preferences))
+            window.delegate = self
             if !window.setFrameUsingName("RefsLibrary") {
                 window.setContentSize(NSSize(width: 1120, height: 700))
                 window.center()
             }
             libraryWindow = window
         }
+        libraryOpen = true
+        applyDockPolicy()
         NSApp.activate(ignoringOtherApps: true)
         libraryWindow?.makeKeyAndOrderFront(nil)
     }

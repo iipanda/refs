@@ -78,7 +78,9 @@ final class SavePanelController: NSObject, NSWindowDelegate {
         draft = SaveDraft(capture: capture)
         self.onFinish = onFinish
         panel = KeyablePanel(contentRect: NSRect(x: 0, y: 0, width: 400, height: 380),
-                             styleMask: [.titled, .closable, .fullSizeContentView],
+                             // Non-activating, so saving doesn't bring the Library forward or take
+                             // the user out of the app they were in.
+                             styleMask: [.titled, .closable, .fullSizeContentView, .nonactivatingPanel],
                              backing: .buffered, defer: false)
         super.init()
 
@@ -102,7 +104,6 @@ final class SavePanelController: NSObject, NSWindowDelegate {
 
     func show() {
         position(near: draft.capture.frame)
-        NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
     }
 

@@ -1,9 +1,13 @@
 import AppKit
 
-/// A transparent full-screen window that dims the screen and shows the selection. One per display.
-final class OverlayWindow: NSWindow {
+/// A transparent full-screen panel that dims the screen and shows the selection. One per display.
+/// It's non-activating: it receives keys and clicks while the captured app stays frontmost.
+final class OverlayWindow: NSPanel {
     init(screen: NSScreen, session: CaptureSession) {
-        super.init(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        super.init(contentRect: screen.frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        isFloatingPanel = true
+        becomesKeyOnlyIfNeeded = false
+        hidesOnDeactivate = false
         setFrame(screen.frame, display: false)
         level = .screenSaver
         isOpaque = false

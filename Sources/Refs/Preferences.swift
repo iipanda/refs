@@ -71,6 +71,20 @@ struct Shortcut: Codable, Equatable {
     ]
 }
 
+/// When the Dock icon is shown.
+enum DockIconMode: String, CaseIterable, Identifiable {
+    case whileLibraryOpen, always, never
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .whileLibraryOpen: "While Library is open"
+        case .always: "Always"
+        case .never: "Never"
+        }
+    }
+}
+
 enum HotKeyAction: UInt32, CaseIterable {
     case captureArea = 1
     case captureWindow = 2
@@ -83,7 +97,7 @@ final class Preferences: ObservableObject {
     private let defaults = UserDefaults.standard
 
     @Published var showMenuBarIcon: Bool { didSet { defaults.set(showMenuBarIcon, forKey: "showMenuBarIcon") } }
-    @Published var showDockIcon: Bool { didSet { defaults.set(showDockIcon, forKey: "showDockIcon") } }
+    @Published var dockIconMode: DockIconMode { didSet { defaults.set(dockIconMode.rawValue, forKey: "dockIcon") } }
     @Published var captureArea: Shortcut? { didSet { save(captureArea, "shortcut.captureArea") } }
     @Published var captureWindow: Shortcut? { didSet { save(captureWindow, "shortcut.captureWindow") } }
     @Published var openLibrary: Shortcut? { didSet { save(openLibrary, "shortcut.openLibrary") } }
@@ -92,9 +106,14 @@ final class Preferences: ObservableObject {
     @Published var onboardingCompleted: Bool { didSet { defaults.set(onboardingCompleted, forKey: "onboardingCompleted") } }
 
     private init() {
-        defaults.register(defaults: ["showMenuBarIcon": true, "showDockIcon": false])
+        defaults.register(defaults: ["showMenuBarIcon": true])
         showMenuBarIcon = defaults.bool(forKey: "showMenuBarIcon")
-        showDockIcon = defaults.bool(forKey: "showDockIcon")
+        if let mode = defaults.string(forKey: "dockIcon").flatMap(DockIconMode.init(rawValue:)) {
+            dockIconMode = mode
+        } else {
+            // 0.1 had an on/off toggle; "on" meant always.
+            dockIconMode = defaults.bool(forKey: "showDockIcon") ? .always : .whileLibraryOpen
+        }
         captureArea = Self.load("shortcut.captureArea", defaults: defaults, fallback: .captureAreaDefault)
         captureWindow = Self.load("shortcut.captureWindow", defaults: defaults, fallback: .captureWindowDefault)
         openLibrary = Self.load("shortcut.openLibrary", defaults: defaults, fallback: nil)
