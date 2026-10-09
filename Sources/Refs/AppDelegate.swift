@@ -151,6 +151,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         showLibrary()
     }
 
+    // MARK: - Main menu
+
+    /// Shown while Refs is the active app, e.g. with the Library open. The Edit menu also makes
+    /// copy, paste and undo work in text fields.
+    private func makeMainMenu() -> NSMenu {
+        let main = NSMenu()
+
+        let appMenu = NSMenu(title: "Refs")
+        appMenu.addItem(withTitle: "About Refs", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        appMenu.addItem(.separator())
+        appMenu.addItem(item("Settings…", #selector(openSettingsAction), nil, key: ","))
+        appMenu.addItem(item("Set Up Permissions…", #selector(openOnboardingAction), nil))
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "Hide Refs", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        let hideOthers = appMenu.addItem(withTitle: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
+        hideOthers.keyEquivalentModifierMask = [.command, .option]
+        appMenu.addItem(withTitle: "Show All", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "Quit Refs", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+
+        let fileMenu = NSMenu(title: "File")
+        fileMenu.addItem(item("Capture Area", #selector(captureAreaAction), preferences.captureArea))
+        fileMenu.addItem(item("Capture Window", #selector(captureWindowAction), preferences.captureWindow))
+        fileMenu.addItem(.separator())
+        fileMenu.addItem(withTitle: "Close Window", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+
+        let editMenu = NSMenu(title: "Edit")
+        editMenu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        let redo = editMenu.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "z")
+        redo.keyEquivalentModifierMask = [.command, .shift]
+        editMenu.addItem(.separator())
+        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+
+        let windowMenu = NSMenu(title: "Window")
+        windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        windowMenu.addItem(withTitle: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+        windowMenu.addItem(.separator())
+        windowMenu.addItem(item("Library", #selector(openLibraryAction), preferences.openLibrary))
+        NSApp.windowsMenu = windowMenu
+
+        for menu in [appMenu, fileMenu, editMenu, windowMenu] {
+            let holder = NSMenuItem(title: menu.title, action: nil, keyEquivalent: "")
+            holder.submenu = menu
+            main.addItem(holder)
+        }
+        return main
+    }
+
     // MARK: - Hotkeys and Dock
 
     private func registerHotKeys() {
@@ -162,6 +213,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             if !ok { unavailable.insert(action) }
         }
         hotKeyStatus.unavailable = unavailable
+        // The File menu shows the capture shortcuts.
+        NSApp.mainMenu = makeMainMenu()
     }
 
     private func perform(_ action: HotKeyAction) {
@@ -266,7 +319,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             window.title = "Refs"
             window.isReleasedWhenClosed = false
             window.setFrameAutosaveName("RefsLibrary")
-            window.contentViewController = NSHostingController(rootView: LibraryView(model: library, preferences: preferences))
+            window.contentViewController = NSHostingController(rootView: LibraryView(
+                model: library, preferences: preferences, openSettings: { [weak self] in self?.showSettings() }))
             window.delegate = self
             if !window.setFrameUsingName("RefsLibrary") {
                 window.setContentSize(NSSize(width: 1120, height: 700))

@@ -11,6 +11,7 @@ enum SidebarItem: Hashable {
 struct LibraryView: View {
     @ObservedObject var model: LibraryModel
     @ObservedObject var preferences: Preferences
+    var openSettings: () -> Void = {}
     @State private var sidebar: SidebarItem? = .all
     @State private var search = ""
 
@@ -30,6 +31,14 @@ struct LibraryView: View {
                 }
         }
         .searchable(text: $search, placement: .toolbar, prompt: "Search notes, sites, apps")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(action: openSettings) {
+                    Label("Settings", systemImage: "gearshape")
+                }
+                .help("Settings (⌘,)")
+            }
+        }
         .frame(minWidth: 700, minHeight: 520)
         .onChange(of: sidebar) { deselectIfHidden() }
         .onChange(of: search) { deselectIfHidden() }
