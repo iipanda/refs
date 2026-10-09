@@ -5,21 +5,54 @@ import RefsCore
 final class LibraryModel: ObservableObject {
     @Published private(set) var refs: [Reference] = []
     @Published var selectedID: String?
+    /// Website icons by host, loaded from the library's icon cache.
+    @Published private(set) var favicons: [String: NSImage] = [:]
     private(set) var store: LibraryStore
+    private var faviconCache: FaviconCache
+    private var faviconsInFlight = Set<String>()
 
     init(root: URL) {
         store = LibraryStore(root: root)
+        faviconCache = FaviconCache(libraryRoot: root)
         reload()
     }
 
     func changeRoot(_ root: URL) {
         store = LibraryStore(root: root)
+        faviconCache = FaviconCache(libraryRoot: root)
+        favicons = [:]
         selectedID = nil
         reload()
     }
 
     func reload() {
         refs = store.loadAll()
+        loadFavicons()
+    }
+
+    /// Shows cached icons right away and fetches missing ones in the background, one request per site.
+    private func loadFavicons() {
+        var pages: [String: String] = [:]
+        for ref in refs {
+            if let web = ref.web, let host = web.host, pages[host] == nil { pages[host] = web.url }
+        }
+        let cache = faviconCache
+        for (host, page) in pages where favicons[host] == nil && !faviconsInFlight.contains(host) {
+            if let url = cache.cachedIcon(host: host), let image = NSImage(contentsOf: url) {
+                favicons[host] = image
+                continue
+            }
+            guard cache.needsFetch(host: host) else { continue }
+            faviconsInFlight.insert(host)
+            Task { @MainActor [weak self] in
+                let url = await cache.fetch(host: host, pageURL: page)
+                guard let self, cache === self.faviconCache else { return }
+                faviconsInFlight.remove(host)
+                if let url, let image = NSImage(contentsOf: url) {
+                    favicons[host] = image
+                }
+            }
+        }
     }
 
     func reference(id: String?) -> Reference? {
@@ -43,6 +76,7 @@ final class LibraryModel: ObservableObject {
             note: draft.note.trimmingCharacters(in: .whitespacesAndNewlines)
         )
         refs.insert(ref, at: 0)
+        loadFavicons()
         return ref
     }
 

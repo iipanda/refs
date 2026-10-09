@@ -58,7 +58,7 @@ struct LibraryView: View {
             if !summary.sites.isEmpty {
                 Section("Websites") {
                     ForEach(summary.sites, id: \.name) { entry in
-                        Label(entry.name, systemImage: "globe")
+                        Label { Text(entry.name) } icon: { SiteIcon(image: model.favicons[entry.name]) }
                             .badge(entry.count)
                             .tag(SidebarItem.site(entry.name))
                     }
@@ -99,7 +99,8 @@ struct LibraryView: View {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 170, maximum: 260), spacing: 16)], spacing: 18) {
                         ForEach(refs) { ref in
                             ReferenceCard(ref: ref, imageURL: model.imageURL(for: ref),
-                                          selected: model.selectedID == ref.id)
+                                          selected: model.selectedID == ref.id,
+                                          favicon: { model.favicons[$0] })
                                 .onTapGesture(count: 2) { NSWorkspace.shared.open(model.imageURL(for: ref)) }
                                 .simultaneousGesture(TapGesture().onEnded { model.selectedID = ref.id })
                                 .contextMenu { contextMenu(for: ref) }
@@ -151,6 +152,7 @@ struct ReferenceCard: View {
     let ref: Reference
     let imageURL: URL
     let selected: Bool
+    var favicon: (String) -> NSImage? = { _ in nil }
     @State private var image: NSImage?
 
     var body: some View {
@@ -172,7 +174,11 @@ struct ReferenceCard: View {
             )
 
             HStack(spacing: 5) {
-                AppIcon(bundleID: ref.app.bundleID, size: 14)
+                if let host = ref.web?.host {
+                    SiteIcon(image: favicon(host), size: 14)
+                } else {
+                    AppIcon(bundleID: ref.app.bundleID, size: 14)
+                }
                 Text(ref.sourceLabel)
                     .font(.callout.weight(.medium))
                     .lineLimit(1)
@@ -287,4 +293,23 @@ struct InspectorView: View {
 func copy(_ text: String) {
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(text, forType: .string)
+}
+
+/// A website's icon, or a globe while it loads or when the site has none.
+struct SiteIcon: View {
+    let image: NSImage?
+    var size: CGFloat = 16
+
+    var body: some View {
+        if let image {
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: size, height: size)
+                .clipShape(RoundedRectangle(cornerRadius: size * 0.22))
+        } else {
+            Image(systemName: "globe")
+                .frame(width: size, height: size)
+        }
+    }
 }
