@@ -18,6 +18,33 @@ final class BrowserPermissionsModel: ObservableObject {
     /// The browser whose prompt is currently showing, during a request.
     @Published private(set) var requesting: String?
     @Published private(set) var loaded = false
+    private var observers: [NSObjectProtocol] = []
+
+    init() {
+        // Keep the list current without reopening it: a browser opening or quitting changes what
+        // macOS can report, and answers can arrive from the save panel or System Settings.
+        let workspace = NSWorkspace.shared.notificationCenter
+        let refresh: (Notification) -> Void = { [weak self] _ in self?.refreshIfIdle() }
+        observers = [
+            workspace.addObserver(forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main, using: refresh),
+            workspace.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main, using: refresh),
+            NotificationCenter.default.addObserver(forName: BrowserSupport.permissionsChanged, object: nil, queue: .main, using: refresh),
+            NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main, using: refresh),
+        ]
+    }
+
+    deinit {
+        observers.forEach {
+            NSWorkspace.shared.notificationCenter.removeObserver($0)
+            NotificationCenter.default.removeObserver($0)
+        }
+    }
+
+    /// Skips refreshes while a request is running, so its own launches don't reset the list mid-way.
+    private func refreshIfIdle() {
+        guard requesting == nil else { return }
+        refresh()
+    }
 
     var pending: [Row] {
         rows.filter { $0.permission == .notDetermined || $0.permission == .notRunning }
@@ -28,7 +55,7 @@ final class BrowserPermissionsModel: ObservableObject {
     func refresh() {
         Task.detached(priority: .userInitiated) {
             let (supported, unsupported) = BrowserSupport.installedBrowsers()
-            let rows = supported.map { Row(browser: $0, permission: BrowserSupport.permission(for: $0.bundleID, ask: false)) }
+            let rows = supported.map { Row(browser: $0, permission: BrowserSupport.knownPermission(for: $0.bundleID)) }
             await MainActor.run {
                 self.rows = rows
                 self.unsupported = unsupported

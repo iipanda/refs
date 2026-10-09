@@ -119,16 +119,55 @@ enum BrowserSupport {
 
     /// Checks (and optionally asks for) permission to send Apple Events to a browser.
     /// Asking blocks until the user answers, so call it off the main thread.
+    ///
+    /// macOS can only answer while the browser is running; otherwise this returns `.notRunning`.
+    /// Use `knownPermission(for:)` to show a status for closed browsers.
     static func permission(for bundleID: String, ask: Bool) -> Permission {
         let target = NSAppleEventDescriptor(bundleIdentifier: bundleID)
         guard let desc = target.aeDesc else { return .unknown(-1) }
         let status = AEDeterminePermissionToAutomateTarget(desc, typeWildCard, typeWildCard, ask)
+        let permission: Permission
         switch Int(status) {
-        case Int(noErr): return .granted
-        case errAEEventNotPermitted: return .denied
-        case errAEEventWouldRequireUserConsent: return .notDetermined
-        case procNotFound: return .notRunning
-        default: return .unknown(status)
+        case Int(noErr): permission = .granted
+        case errAEEventNotPermitted: permission = .denied
+        case errAEEventWouldRequireUserConsent: permission = .notDetermined
+        case procNotFound: permission = .notRunning
+        default: permission = .unknown(status)
+        }
+        remember(permission, for: bundleID)
+        return permission
+    }
+
+    /// The live status when the browser is running, otherwise the last answer seen for it.
+    static func knownPermission(for bundleID: String) -> Permission {
+        let live = permission(for: bundleID, ask: false)
+        guard live == .notRunning else { return live }
+        switch UserDefaults.standard.dictionary(forKey: rememberedKey)?[bundleID] as? String {
+        case "granted": return .granted
+        case "denied": return .denied
+        default: return .notRunning
+        }
+    }
+
+    static let permissionsChanged = Notification.Name("RefsBrowserPermissionsChanged")
+    private static let rememberedKey = "browserPermissions"
+
+    /// Keeps the last definite answer per browser, since macOS won't report it while the browser is closed.
+    private static func remember(_ permission: Permission, for bundleID: String) {
+        let value: String?
+        switch permission {
+        case .granted: value = "granted"
+        case .denied: value = "denied"
+        case .notDetermined: value = nil // e.g. reset with tccutil
+        case .notRunning, .unknown: return
+        }
+        let defaults = UserDefaults.standard
+        var remembered = defaults.dictionary(forKey: rememberedKey) as? [String: String] ?? [:]
+        guard remembered[bundleID] != value else { return }
+        remembered[bundleID] = value
+        defaults.set(remembered, forKey: rememberedKey)
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: permissionsChanged, object: bundleID)
         }
     }
 
