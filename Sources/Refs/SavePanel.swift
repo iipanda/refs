@@ -10,7 +10,7 @@ final class SaveDraft: ObservableObject {
     @Published var title: String
     @Published var url: String
     @Published var note = ""
-    @Published var browserNeedingPermission: BrowserSupport.Browser?
+    @Published var browserAccess: BrowserAccess?
     @Published var askingPermission = false
 
     init(capture: CaptureResult) {
@@ -21,12 +21,12 @@ final class SaveDraft: ObservableObject {
         appName = capture.app.name
         title = capture.web?.title ?? capture.windowTitle ?? ""
         url = capture.web?.url ?? ""
-        browserNeedingPermission = capture.browserNeedingPermission
+        browserAccess = capture.browserAccess
     }
 
     /// Asks for Automation permission (macOS shows its prompt), then reads the tab URL.
     func allowBrowserAccess() {
-        guard let browser = browserNeedingPermission, let window = capture.sourceWindow else { return }
+        guard case .needsPermission(let browser) = browserAccess, let window = capture.sourceWindow else { return }
         askingPermission = true
         let isFrontmost = capture.sourceWindowIsFrontmostOfApp
         Task.detached(priority: .userInitiated) {
@@ -35,7 +35,11 @@ final class SaveDraft: ObservableObject {
             let tab = BrowserSupport.tab(for: window, among: tabs, isFrontmostOfApp: isFrontmost)
             await MainActor.run {
                 self.askingPermission = false
-                self.browserNeedingPermission = nil
+                switch permission {
+                case .granted: self.browserAccess = nil
+                case .denied: self.browserAccess = .denied(browser)
+                default: break
+                }
                 if let tab {
                     self.url = tab.url
                     if let title = tab.title, !title.isEmpty { self.title = title }
@@ -156,15 +160,8 @@ struct SaveView: View {
 
             sourceRow
 
-            if let browser = draft.browserNeedingPermission {
-                HStack(spacing: 8) {
-                    Image(systemName: "link").foregroundStyle(.secondary)
-                    Text("Allow Refs to read the page URL from \(browser.name)?")
-                        .font(.callout)
-                    Spacer()
-                    Button(draft.askingPermission ? "Waiting…" : "Allow…") { draft.allowBrowserAccess() }
-                        .disabled(draft.askingPermission)
-                }
+            if let access = draft.browserAccess {
+                BrowserAccessBanner(access: access, asking: draft.askingPermission, onAllow: draft.allowBrowserAccess)
             }
 
             TextField("What do you like about it?", text: $draft.note, axis: .vertical)
@@ -267,5 +264,56 @@ struct AppIcon: View {
         }
         cache.setObject(icon, forKey: key)
         return icon
+    }
+}
+
+/// Explains why a browser capture has no URL, and how to fix it.
+struct BrowserAccessBanner: View {
+    let access: BrowserAccess
+    let asking: Bool
+    let onAllow: () -> Void
+
+    var body: some View {
+        switch access {
+        case .needsPermission(let browser):
+            banner(icon: "link.badge.plus", tint: .accentColor,
+                   title: "Record the page URL too?",
+                   detail: "Refs needs your permission to read the current tab in \(browser.name). macOS asks once.") {
+                Button(asking ? "Waiting…" : "Allow…", action: onAllow)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(asking)
+            }
+        case .denied(let browser):
+            banner(icon: "exclamationmark.triangle.fill", tint: .orange,
+                   title: "URL not recorded",
+                   detail: "\(browser.name) isn't allowed to share its current page with Refs. Turn it on under Automation.") {
+                Button("Open Settings…") { openPrivacyPane("Privacy_Automation") }
+            }
+        case .unsupported(let name):
+            Label("\(name) doesn't share its current page. Add the URL with Edit if you want it.", systemImage: "info.circle")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func banner<Action: View>(icon: String, tint: Color, title: String, detail: String,
+                                      @ViewBuilder action: () -> Action) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(tint)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).fontWeight(.semibold)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 6)
+            action()
+        }
+        .padding(10)
+        .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(tint.opacity(0.35)))
     }
 }

@@ -1,5 +1,6 @@
 import AppKit
 import Carbon.HIToolbox
+import RefsCore
 
 /// The active tab of one browser window, as reported over Apple Events.
 struct BrowserTab: Equatable {
@@ -8,39 +9,106 @@ struct BrowserTab: Equatable {
     var title: String?
 }
 
-/// Reads the current page from scriptable browsers. Firefox-based browsers don't expose tabs to
-/// AppleScript, so they fall back to the window title.
+/// Reads the current page from scriptable browsers.
+///
+/// Browsers are detected from their scripting definition rather than a fixed list: anything with
+/// Chrome's `active tab` (Chrome, Arc, Helium, Brave, Edge and other Chromium forks) or Safari's
+/// `current tab` works. Browsers without tab scripting, like Firefox and Zen, fall back to the
+/// window title.
 enum BrowserSupport {
     enum Dialect { case safari, chromium }
 
-    struct Browser: Identifiable {
+    struct Browser: Identifiable, Hashable {
         var bundleID: String
         var name: String
         var dialect: Dialect
+        var appURL: URL
         var id: String { bundleID }
     }
 
-    static let known: [Browser] = [
-        Browser(bundleID: "com.apple.Safari", name: "Safari", dialect: .safari),
-        Browser(bundleID: "com.apple.SafariTechnologyPreview", name: "Safari Technology Preview", dialect: .safari),
-        Browser(bundleID: "com.google.Chrome", name: "Google Chrome", dialect: .chromium),
-        Browser(bundleID: "com.google.Chrome.beta", name: "Google Chrome Beta", dialect: .chromium),
-        Browser(bundleID: "com.google.Chrome.canary", name: "Google Chrome Canary", dialect: .chromium),
-        Browser(bundleID: "company.thebrowser.Browser", name: "Arc", dialect: .chromium),
-        Browser(bundleID: "company.thebrowser.dia", name: "Dia", dialect: .chromium),
-        Browser(bundleID: "com.brave.Browser", name: "Brave", dialect: .chromium),
-        Browser(bundleID: "com.microsoft.edgemac", name: "Microsoft Edge", dialect: .chromium),
-        Browser(bundleID: "com.vivaldi.Vivaldi", name: "Vivaldi", dialect: .chromium),
-        Browser(bundleID: "com.operasoftware.Opera", name: "Opera", dialect: .chromium),
-    ]
-
-    static func browser(bundleID: String?) -> Browser? {
-        guard let bundleID else { return nil }
-        return known.first { $0.bundleID == bundleID }
+    /// An installed app that opens web links but can't report its current tab.
+    struct UnsupportedBrowser: Identifiable, Hashable {
+        var bundleID: String
+        var name: String
+        var id: String { bundleID }
     }
 
-    static var installed: [Browser] {
-        known.filter { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0.bundleID) != nil }
+    // MARK: - Detection
+
+    private static let lock = NSLock()
+    private static var cache: [String: Browser?] = [:]
+
+    /// The scriptable browser with this bundle ID, if it is one. Results are cached.
+    static func browser(bundleID: String?) -> Browser? {
+        guard let bundleID else { return nil }
+        lock.lock()
+        if let cached = cache[bundleID] {
+            lock.unlock()
+            return cached
+        }
+        lock.unlock()
+
+        let browser = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
+            .flatMap { probe(appURL: $0, bundleID: bundleID) }
+        lock.lock()
+        cache[bundleID] = browser
+        lock.unlock()
+        return browser
+    }
+
+    /// Installed apps that handle https links, split into those Refs can read and those it can't.
+    static func installedBrowsers() -> (supported: [Browser], unsupported: [UnsupportedBrowser]) {
+        guard let sample = URL(string: "https://example.com") else { return ([], []) }
+        var seen = Set<String>()
+        var supported: [Browser] = []
+        var unsupported: [UnsupportedBrowser] = []
+        for url in NSWorkspace.shared.urlsForApplications(toOpen: sample) {
+            guard let bundle = Bundle(url: url), let bundleID = bundle.bundleIdentifier,
+                  bundleID != LibraryLocation.bundleID, seen.insert(bundleID).inserted,
+                  // Skip copies inside other apps, caches and build folders.
+                  !url.path.contains(".app/Contents/"), !url.path.contains("/Library/Caches/"),
+                  // Link routers like Finicky run in the background and never show pages themselves.
+                  !isBackgroundOnly(bundle)
+            else { continue }
+            if let browser = browser(bundleID: bundleID) {
+                supported.append(browser)
+            } else {
+                unsupported.append(UnsupportedBrowser(bundleID: bundleID, name: displayName(of: url)))
+            }
+        }
+        return (supported.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending },
+                unsupported.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending })
+    }
+
+    private static func probe(appURL: URL, bundleID: String) -> Browser? {
+        guard let info = Bundle(url: appURL)?.infoDictionary else { return nil }
+        let scriptable = (info["NSAppleScriptEnabled"] as? Bool) ?? ((info["NSAppleScriptEnabled"] as? String)?.lowercased() == "yes")
+        guard scriptable, let sdefName = info["OSAScriptingDefinition"] as? String else { return nil }
+        let sdefURL = appURL.appendingPathComponent("Contents/Resources").appendingPathComponent(sdefName)
+        guard let sdef = try? String(contentsOf: sdefURL, encoding: .utf8) else { return nil }
+
+        let dialect: Dialect
+        if sdef.contains("name=\"active tab\"") {
+            dialect = .chromium
+        } else if sdef.contains("name=\"current tab\"") {
+            dialect = .safari
+        } else {
+            return nil
+        }
+        return Browser(bundleID: bundleID, name: displayName(of: appURL), dialect: dialect, appURL: appURL)
+    }
+
+    private static func isBackgroundOnly(_ bundle: Bundle) -> Bool {
+        let info = bundle.infoDictionary ?? [:]
+        func flag(_ key: String) -> Bool {
+            (info[key] as? Bool) ?? ["1", "yes", "true"].contains((info[key] as? String)?.lowercased() ?? "")
+        }
+        return flag("LSUIElement") || flag("LSBackgroundOnly")
+    }
+
+    private static func displayName(of appURL: URL) -> String {
+        let name = FileManager.default.displayName(atPath: appURL.path)
+        return name.hasSuffix(".app") ? String(name.dropLast(4)) : name
     }
 
     // MARK: - Automation permission

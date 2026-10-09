@@ -11,6 +11,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem?
     private var libraryWindow: NSWindow?
     private var settingsWindow: NSWindow?
+    private var onboardingWindow: NSWindow?
+    private let browserPermissions = BrowserPermissionsModel()
     private var session: CaptureSession?
     private var savePanel: SavePanelController?
     /// The app that was frontmost before a capture, so focus can go back to it afterwards.
@@ -21,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         applyDockPolicy()
         applyStatusItem()
         registerHotKeys()
+        browserPermissions.refresh()
 
         preferences.$showMenuBarIcon.dropFirst().receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.applyStatusItem() }.store(in: &cancellables)
@@ -41,8 +44,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         #endif
 
-        // Opening the app with both icons hidden would otherwise show nothing at all.
-        if !preferences.showMenuBarIcon && !preferences.showDockIcon {
+        if !preferences.onboardingCompleted {
+            showOnboarding()
+        } else if !preferences.showMenuBarIcon && !preferences.showDockIcon {
+            // Opening the app with both icons hidden would otherwise show nothing at all.
             showSettings()
         }
     }
@@ -103,6 +108,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         menu.addItem(item("Open Library…", #selector(openLibraryAction), preferences.openLibrary))
         menu.addItem(item("Settings…", #selector(openSettingsAction), nil, key: ","))
+        if !CGPreflightScreenCaptureAccess() || !browserPermissions.allDecided {
+            menu.addItem(item("Set Up Permissions…", #selector(openOnboardingAction), nil))
+        }
         menu.addItem(.separator())
         menu.addItem(item("Quit Refs", #selector(NSApplication.terminate(_:)), nil, key: "q", target: NSApp))
     }
@@ -134,6 +142,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func captureWindowAction() { startCapture(.window) }
     @objc private func openLibraryAction() { showLibrary() }
     @objc private func openSettingsAction() { showSettings() }
+    @objc private func openOnboardingAction() { showOnboarding() }
 
     @objc private func openRecent(_ sender: NSMenuItem) {
         library.selectedID = sender.representedObject as? String
@@ -178,7 +187,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         guard savePanel == nil else { return }
         guard CGPreflightScreenCaptureAccess() else {
-            requestScreenRecording()
+            showOnboarding()
             return
         }
 
@@ -220,23 +229,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Hands focus back to the app the user was in, unless one of our windows is in use.
     private func restoreFocus() {
         defer { previousApp = nil }
-        let ourWindowsVisible = [libraryWindow, settingsWindow].contains { $0?.isVisible == true }
+        let ourWindowsVisible = [libraryWindow, settingsWindow, onboardingWindow].contains { $0?.isVisible == true }
         guard !ourWindowsVisible else { return }
         previousApp?.activate()
-    }
-
-    private func requestScreenRecording() {
-        // Shows the system prompt the first time; afterwards it only opens System Settings.
-        CGRequestScreenCaptureAccess()
-        NSApp.activate(ignoringOtherApps: true)
-        let alert = NSAlert()
-        alert.messageText = "Refs needs Screen Recording permission"
-        alert.informativeText = "Turn on Refs in System Settings › Privacy & Security › Screen & System Audio Recording, then quit and reopen Refs."
-        alert.addButton(withTitle: "Open System Settings")
-        alert.addButton(withTitle: "Later")
-        if alert.runModal() == .alertFirstButtonReturn {
-            openPrivacyPane("Privacy_ScreenCapture")
-        }
     }
 
     private func showError(_ title: String, _ message: String) {
@@ -269,6 +264,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         libraryWindow?.makeKeyAndOrderFront(nil)
     }
 
+    func showOnboarding() {
+        if onboardingWindow == nil {
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 520),
+                                  styleMask: [.titled, .closable, .fullSizeContentView],
+                                  backing: .buffered, defer: false)
+            window.titlebarAppearsTransparent = true
+            window.titleVisibility = .hidden
+            window.isMovableByWindowBackground = true
+            window.isReleasedWhenClosed = false
+            window.contentViewController = NSHostingController(rootView: OnboardingView(
+                browsers: browserPermissions, preferences: preferences,
+                onDone: { [weak self] in
+                    self?.preferences.onboardingCompleted = true
+                    self?.onboardingWindow?.close()
+                }))
+            window.center()
+            onboardingWindow = window
+        }
+        browserPermissions.refresh()
+        NSApp.activate(ignoringOtherApps: true)
+        onboardingWindow?.makeKeyAndOrderFront(nil)
+    }
+
     func showSettings() {
         if settingsWindow == nil {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 540, height: 480),
@@ -297,11 +315,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         library.selectedID = library.refs.first?.id
         showLibrary()
         showSettings()
+        showOnboarding()
         if let ref = library.refs.first,
            let image = ImageCoding.thumbnail(at: library.imageURL(for: ref), maxPixelSize: 4096) {
             let capture = CaptureResult(
                 image: image, scale: 2, app: ref.app, windowTitle: ref.windowTitle, web: ref.web,
-                browserNeedingPermission: BrowserSupport.known[2],
+                browserAccess: BrowserSupport.browser(bundleID: "com.google.Chrome").map { .needsPermission($0) },
                 frame: NSRect(x: 100, y: 200, width: 600, height: 300), sourceWindow: nil,
                 sourceWindowIsFrontmostOfApp: false)
             let panel = SavePanelController(capture: capture) { _ in }
@@ -311,6 +330,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [self] in
             write(libraryWindow, "library.png")
             write(settingsWindow, "settings.png")
+            write(onboardingWindow, "onboarding.png")
             write(NSApp.windows.first { $0 is NSPanel && $0.isVisible }, "save-panel.png")
             NSApp.terminate(nil)
         }

@@ -19,15 +19,19 @@ between builds: macOS ties Screen Recording and browser Automation permissions t
 
 ## Use
 
-- **⌃⇧2** captures an area, **⌃⇧3** a window. Space switches between the two while selecting, and Esc cancels.
+- **⌘⇧2** captures an area, **⌘⇧3** a window. Space switches between the two while selecting, and Esc cancels.
 - After capturing, type what you like and press Return. Esc discards.
 - The library groups references by app (native apps) and website (browser captures).
 
-Permissions:
+⌘⇧3 is also macOS's "Save picture of screen" shortcut. Turn that off in System Settings › Keyboard ›
+Keyboard Shortcuts › Screenshots, or pick another shortcut in Refs' Settings.
+
+Permissions (a setup window walks through both on first launch):
 - **Screen Recording** is required. Quit and reopen Refs after granting it.
-- **Automation** is asked once per browser, the first time you capture from it. It reads the URL and
-  title of the active tab in Safari and Chromium browsers (Chrome, Arc, Brave, Edge, Vivaldi, Opera, Dia).
-  Firefox and Zen don't support this, so captures from them record the window title only.
+- **Automation**, once per browser, to read the URL and title of the active tab. "Allow All Browsers"
+  asks each installed browser in turn. Any browser with Safari- or Chrome-style tab scripting works
+  (Safari, Chrome, Arc, Helium, Brave, Edge and other Chromium forks). Firefox and Zen don't support it,
+  so captures from them record the window title only.
 
 ## Agents (MCP)
 

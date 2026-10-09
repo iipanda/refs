@@ -28,8 +28,14 @@ struct Shortcut: Codable, Equatable {
         return flags
     }
 
-    static let captureAreaDefault = Shortcut(keyCode: UInt32(kVK_ANSI_2), carbonModifiers: UInt32(controlKey | shiftKey), key: "2")
-    static let captureWindowDefault = Shortcut(keyCode: UInt32(kVK_ANSI_3), carbonModifiers: UInt32(controlKey | shiftKey), key: "3")
+    static let captureAreaDefault = Shortcut(keyCode: UInt32(kVK_ANSI_2), carbonModifiers: UInt32(cmdKey | shiftKey), key: "2")
+    static let captureWindowDefault = Shortcut(keyCode: UInt32(kVK_ANSI_3), carbonModifiers: UInt32(cmdKey | shiftKey), key: "3")
+
+    /// Defaults from 0.1.0, replaced by the ⌘⇧ versions when found unchanged.
+    static let legacyDefaults = [
+        Shortcut(keyCode: UInt32(kVK_ANSI_2), carbonModifiers: UInt32(controlKey | shiftKey), key: "2"),
+        Shortcut(keyCode: UInt32(kVK_ANSI_3), carbonModifiers: UInt32(controlKey | shiftKey), key: "3"),
+    ]
 
     /// Builds a shortcut from a key press. Returns nil unless ⌘, ⌃ or ⌥ is held, or the key is a function key.
     init?(event: NSEvent) {
@@ -83,6 +89,7 @@ final class Preferences: ObservableObject {
     @Published var openLibrary: Shortcut? { didSet { save(openLibrary, "shortcut.openLibrary") } }
     /// Custom library folder. Nil means the default location.
     @Published var libraryPath: String? { didSet { defaults.set(libraryPath, forKey: LibraryLocation.defaultsKey) } }
+    @Published var onboardingCompleted: Bool { didSet { defaults.set(onboardingCompleted, forKey: "onboardingCompleted") } }
 
     private init() {
         defaults.register(defaults: ["showMenuBarIcon": true, "showDockIcon": false])
@@ -92,6 +99,21 @@ final class Preferences: ObservableObject {
         captureWindow = Self.load("shortcut.captureWindow", defaults: defaults, fallback: .captureWindowDefault)
         openLibrary = Self.load("shortcut.openLibrary", defaults: defaults, fallback: nil)
         libraryPath = defaults.string(forKey: LibraryLocation.defaultsKey)
+        onboardingCompleted = defaults.bool(forKey: "onboardingCompleted")
+        migrateLegacyShortcuts()
+    }
+
+    /// Moves shortcuts still set to the old ⌃⇧ defaults to the current ⌘⇧ defaults. Custom ones are kept.
+    private func migrateLegacyShortcuts() {
+        // Saved explicitly: property observers don't run during init.
+        if captureArea == Shortcut.legacyDefaults[0] {
+            captureArea = .captureAreaDefault
+            save(captureArea, "shortcut.captureArea")
+        }
+        if captureWindow == Shortcut.legacyDefaults[1] {
+            captureWindow = .captureWindowDefault
+            save(captureWindow, "shortcut.captureWindow")
+        }
     }
 
     func shortcut(for action: HotKeyAction) -> Shortcut? {
@@ -119,5 +141,61 @@ final class Preferences: ObservableObject {
     private static func load(_ key: String, defaults: UserDefaults, fallback: Shortcut?) -> Shortcut? {
         guard let data = defaults.data(forKey: key) else { return fallback }
         return try? JSONDecoder().decode(Shortcut.self, from: data)
+    }
+}
+
+/// macOS's own screenshot shortcuts, which take precedence over app hotkeys while they're enabled.
+enum SystemShortcuts {
+    private struct Entry {
+        var id: String
+        var name: String
+        var keyCode: Int
+        var cocoaModifiers: Int
+    }
+
+    private static let shift = 1 << 17, control = 1 << 18, option = 1 << 19, command = 1 << 20
+
+    /// The screenshot shortcuts with their factory key bindings.
+    private static let screenshot: [Entry] = [
+        Entry(id: "28", name: "Save picture of screen as a file", keyCode: kVK_ANSI_3, cocoaModifiers: shift | command),
+        Entry(id: "29", name: "Copy picture of screen to the clipboard", keyCode: kVK_ANSI_3, cocoaModifiers: shift | control | command),
+        Entry(id: "30", name: "Save picture of selected area as a file", keyCode: kVK_ANSI_4, cocoaModifiers: shift | command),
+        Entry(id: "31", name: "Copy picture of selected area to the clipboard", keyCode: kVK_ANSI_4, cocoaModifiers: shift | control | command),
+        Entry(id: "184", name: "Screenshot and recording options", keyCode: kVK_ANSI_5, cocoaModifiers: shift | command),
+    ]
+
+    /// The name of an enabled macOS screenshot shortcut using the same keys, if any.
+    static func conflict(with shortcut: Shortcut) -> String? {
+        let stored = CFPreferencesCopyAppValue("AppleSymbolicHotKeys" as CFString,
+                                               "com.apple.symbolichotkeys" as CFString) as? [String: Any] ?? [:]
+        let mask = shift | control | option | command
+        var modifiers = 0
+        if shortcut.carbonModifiers & UInt32(shiftKey) != 0 { modifiers |= shift }
+        if shortcut.carbonModifiers & UInt32(controlKey) != 0 { modifiers |= control }
+        if shortcut.carbonModifiers & UInt32(optionKey) != 0 { modifiers |= option }
+        if shortcut.carbonModifiers & UInt32(cmdKey) != 0 { modifiers |= command }
+
+        for entry in screenshot {
+            var enabled = true
+            var keyCode = entry.keyCode
+            var entryModifiers = entry.cocoaModifiers
+            if let custom = stored[entry.id] as? [String: Any] {
+                enabled = (custom["enabled"] as? Bool) ?? ((custom["enabled"] as? Int) == 1)
+                if let parameters = (custom["value"] as? [String: Any])?["parameters"] as? [Int], parameters.count == 3 {
+                    keyCode = parameters[1]
+                    entryModifiers = parameters[2]
+                }
+            }
+            if enabled, keyCode == Int(shortcut.keyCode), entryModifiers & mask == modifiers {
+                return entry.name
+            }
+        }
+        return nil
+    }
+
+    static func openKeyboardShortcuts() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension") {
+            NSWorkspace.shared.open(url)
+        }
     }
 }

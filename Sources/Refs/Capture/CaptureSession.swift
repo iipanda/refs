@@ -9,13 +9,40 @@ struct CaptureResult {
     var app: SourceApp
     var windowTitle: String?
     var web: WebSource?
-    /// Set when the source is a known browser we don't have Automation permission for yet.
-    var browserNeedingPermission: BrowserSupport.Browser?
+    /// Why the URL is missing, when the source is a browser.
+    var browserAccess: BrowserAccess?
     /// Where the capture was, in Cocoa global coordinates, for placing the save panel.
     var frame: NSRect
     /// The source window, so the URL can be read after permission is granted.
     var sourceWindow: WindowInfo?
     var sourceWindowIsFrontmostOfApp: Bool
+}
+
+/// Why a browser capture has no URL.
+enum BrowserAccess: Equatable {
+    /// Refs hasn't asked this browser yet.
+    case needsPermission(BrowserSupport.Browser)
+    /// The user said no; it can only be changed in System Settings.
+    case denied(BrowserSupport.Browser)
+    /// The browser doesn't expose its tabs (Firefox, Zen).
+    case unsupported(String)
+
+    static func check(app: SourceApp) -> BrowserAccess? {
+        if let browser = BrowserSupport.browser(bundleID: app.bundleID) {
+            switch BrowserSupport.permission(for: browser.bundleID, ask: false) {
+            case .notDetermined: return .needsPermission(browser)
+            case .denied: return .denied(browser)
+            default: return nil
+            }
+        }
+        if let bundleID = app.bundleID,
+           let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID),
+           let sample = URL(string: "https://example.com"),
+           NSWorkspace.shared.urlsForApplications(toOpen: sample).contains(appURL) {
+            return .unsupported(app.name)
+        }
+        return nil
+    }
 }
 
 /// One capture from hotkey to result: shows the selection overlay on every screen, tracks the
@@ -229,14 +256,10 @@ final class CaptureSession {
                 if let source, let tab = BrowserSupport.tab(for: source, among: tabs, isFrontmostOfApp: isFrontmost) {
                     web = WebSource(url: tab.url, title: tab.title)
                 }
-                var needsPermission: BrowserSupport.Browser?
-                if web == nil, let browser = BrowserSupport.browser(bundleID: app.bundleID),
-                   BrowserSupport.permission(for: browser.bundleID, ask: false) == .notDetermined {
-                    needsPermission = browser
-                }
+                let access = web == nil ? BrowserAccess.check(app: app) : nil
                 completion(.success(CaptureResult(
                     image: image, scale: scale, app: app, windowTitle: source?.title, web: web,
-                    browserNeedingPermission: needsPermission, frame: frame,
+                    browserAccess: access, frame: frame,
                     sourceWindow: source, sourceWindowIsFrontmostOfApp: isFrontmost
                 )))
             } catch {

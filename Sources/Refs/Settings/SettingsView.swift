@@ -91,6 +91,11 @@ private struct GeneralTab: View {
         }
         .formStyle(.grouped)
         .onAppear(perform: refreshLoginStatus)
+        // Re-check system shortcut conflicts after a trip to System Settings.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshLoginStatus()
+            preferences.objectWillChange.send()
+        }
     }
 
     private func shortcutRow(_ title: String, action: HotKeyAction, binding: Binding<Shortcut?>) -> some View {
@@ -101,6 +106,13 @@ private struct GeneralTab: View {
             if hotKeyStatus.unavailable.contains(action) {
                 Text("Used by another app. Pick a different shortcut.")
                     .foregroundStyle(.red)
+            } else if let shortcut = binding.wrappedValue, let system = SystemShortcuts.conflict(with: shortcut) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("macOS uses \(shortcut.displayString) for “\(system)”. Turn that off so Refs gets it.")
+                        .foregroundStyle(.orange)
+                    Button("Keyboard Shortcuts…") { SystemShortcuts.openKeyboardShortcuts() }
+                        .buttonStyle(.link)
+                }
             }
         }
     }
@@ -203,9 +215,8 @@ struct ShortcutRecorder: View {
 // MARK: - Permissions
 
 private struct PermissionsTab: View {
+    @StateObject private var browsers = BrowserPermissionsModel()
     @State private var screenRecording = CGPreflightScreenCaptureAccess()
-    @State private var browsers: [(BrowserSupport.Browser, BrowserSupport.Permission)] = []
-    @State private var asking: String?
 
     var body: some View {
         Form {
@@ -214,9 +225,12 @@ private struct PermissionsTab: View {
                     if screenRecording {
                         StatusPill(text: "Granted", ok: true)
                     } else {
-                        Button("Grant…") {
-                            CGRequestScreenCaptureAccess()
-                            openPrivacyPane("Privacy_ScreenCapture")
+                        HStack {
+                            Button("Grant…") {
+                                CGRequestScreenCaptureAccess()
+                                openPrivacyPane("Privacy_ScreenCapture")
+                            }
+                            Button("Quit & Reopen") { relaunch() }
                         }
                     }
                 } label: {
@@ -226,20 +240,19 @@ private struct PermissionsTab: View {
             }
 
             Section {
-                if browsers.isEmpty {
-                    Text("No supported browsers found.").foregroundStyle(.secondary)
-                }
-                ForEach(browsers, id: \.0.bundleID) { browser, permission in
-                    LabeledContent {
-                        browserStatus(browser, permission)
-                    } label: {
-                        Label { Text(browser.name) } icon: { AppIcon(bundleID: browser.bundleID) }
+                BrowserPermissionsList(model: browsers)
+            } header: {
+                HStack {
+                    Text("Read the current page from browsers")
+                    Spacer()
+                    if !browsers.pending.isEmpty {
+                        Button(browsers.requesting == nil ? "Allow All" : "Allowing…") { browsers.allowAll() }
+                            .disabled(browsers.requesting != nil)
+                            .controlSize(.small)
                     }
                 }
-            } header: {
-                Text("Read the current page from browsers")
             } footer: {
-                Text("Lets Refs record the URL and page title. macOS asks once per browser. Firefox and Zen don't support this, so captures from them record the window title only.")
+                Text("Lets Refs record the URL and page title. macOS asks once per browser; browsers that aren't open start in the background and close again.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -249,61 +262,15 @@ private struct PermissionsTab: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in refresh() }
     }
 
-    @ViewBuilder
-    private func browserStatus(_ browser: BrowserSupport.Browser, _ permission: BrowserSupport.Permission) -> some View {
-        switch permission {
-        case .granted:
-            StatusPill(text: "Allowed", ok: true)
-        case .denied:
-            Button("Open Settings…") { openPrivacyPane("Privacy_Automation") }
-        case .notDetermined:
-            Button(asking == browser.bundleID ? "Waiting…" : "Allow…") { ask(browser) }
-                .disabled(asking != nil)
-        case .notRunning:
-            Text("Open \(browser.name) to check").foregroundStyle(.secondary).font(.callout)
-        case .unknown:
-            StatusPill(text: "Unknown", ok: false)
-        }
-    }
-
     private func refresh() {
         screenRecording = CGPreflightScreenCaptureAccess()
-        let installed = BrowserSupport.installed
-        Task.detached {
-            let statuses = installed.map { ($0, BrowserSupport.permission(for: $0.bundleID, ask: false)) }
-            await MainActor.run { browsers = statuses }
-        }
-    }
-
-    private func ask(_ browser: BrowserSupport.Browser) {
-        asking = browser.bundleID
-        Task.detached {
-            _ = BrowserSupport.permission(for: browser.bundleID, ask: true)
-            await MainActor.run {
-                asking = nil
-                refresh()
-            }
-        }
+        if browsers.requesting == nil { browsers.refresh() }
     }
 }
 
 func openPrivacyPane(_ anchor: String) {
     if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(anchor)") {
         NSWorkspace.shared.open(url)
-    }
-}
-
-private struct StatusPill: View {
-    let text: String
-    let ok: Bool
-
-    var body: some View {
-        Text(text)
-            .font(.caption.weight(.medium))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 2)
-            .foregroundStyle(ok ? Color.green : Color.orange)
-            .background((ok ? Color.green : Color.orange).opacity(0.15), in: Capsule())
     }
 }
 
