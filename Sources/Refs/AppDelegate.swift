@@ -328,7 +328,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             savePanel = panel
             panel.show()
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [self] in
+        // The split view's materials don't render offscreen, so the grid is also drawn on its own.
+        let gridWindows = [520, 760, 1000].map { width -> (NSWindow, Int) in
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 760),
+                                  styleMask: [.titled], backing: .buffered, defer: false)
+            window.contentView = NSHostingView(rootView: ReferenceGrid(model: library, refs: library.refs)
+                .frame(width: CGFloat(width), height: 760)
+                .background(Color(nsColor: .windowBackgroundColor)))
+            window.orderFront(nil)
+            return (window, width)
+        }
+        // A window whose width changes after layout, like when the details panel opens or closes.
+        let resized = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1000, height: 760),
+                               styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        resized.contentView = NSHostingView(rootView: ReferenceGrid(model: library, refs: library.refs)
+            .background(Color(nsColor: .windowBackgroundColor)))
+        resized.orderFront(nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.3
+                resized.animator().setFrame(NSRect(x: 0, y: 0, width: 700, height: 760), display: true)
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [self] in
+            for (window, width) in gridWindows { write(window, "grid-\(width).png") }
+            write(resized, "grid-resized-700.png")
             write(libraryWindow, "library.png")
             write(settingsWindow, "settings.png")
             write(onboardingWindow, "onboarding.png")

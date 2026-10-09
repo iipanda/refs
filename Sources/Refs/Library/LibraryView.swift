@@ -115,32 +115,7 @@ struct LibraryView: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                GeometryReader { viewport in
-                    ScrollView {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 170, maximum: 260), spacing: 16)], spacing: 18) {
-                            ForEach(refs) { ref in
-                                ReferenceCard(ref: ref, imageURL: model.imageURL(for: ref),
-                                              selected: model.selectedID == ref.id,
-                                              favicon: { model.favicons[$0] })
-                                    .onTapGesture(count: 2) {
-                                        model.selectedID = ref.id
-                                        NSWorkspace.shared.open(model.imageURL(for: ref))
-                                    }
-                                    .simultaneousGesture(TapGesture().onEnded { toggleSelection(ref) })
-                                    .contextMenu { contextMenu(for: ref) }
-                            }
-                        }
-                        .padding(16)
-                        // Fill the viewport so clicks below the last row land on the background.
-                        .frame(maxWidth: .infinity, minHeight: viewport.size.height, alignment: .top)
-                        .background {
-                            // Behind the cards, so it only receives clicks on empty space.
-                            Color.clear
-                                .contentShape(Rectangle())
-                                .onTapGesture { model.selectedID = nil }
-                        }
-                    }
-                }
+                ReferenceGrid(model: model, refs: refs, onToggle: toggleSelection, contextMenu: contextMenu)
                 .onExitCommand { model.selectedID = nil }
             }
         }
@@ -173,12 +148,72 @@ struct LibraryView: View {
     }
 
     @ViewBuilder
-    private func contextMenu(for ref: Reference) -> some View {
+    private func contextMenu(for ref: Reference) -> AnyView {
+        AnyView(contextMenuItems(for: ref))
+    }
+
+    @ViewBuilder
+    private func contextMenuItems(for ref: Reference) -> some View {
         Button("Open") { NSWorkspace.shared.open(model.imageURL(for: ref)) }
         Button("Copy Reference") { copy(model.referenceText(for: ref)) }
         Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([model.imageURL(for: ref)]) }
         Divider()
         Button("Delete", role: .destructive) { model.delete(id: ref.id) }
+    }
+}
+
+/// The scrollable grid of reference cards.
+struct ReferenceGrid: View {
+    @ObservedObject var model: LibraryModel
+    let refs: [Reference]
+    var onToggle: (Reference) -> Void = { _ in }
+    var contextMenu: (Reference) -> AnyView = { _ in AnyView(EmptyView()) }
+
+    static let padding: CGFloat = 16
+    static let spacing: CGFloat = 16
+    static let minimumCardWidth: CGFloat = 180
+
+    /// Columns and card width for a given viewport width. Cards get an exact width so nothing inside
+    /// them (a wide screenshot, a long title) can make a card wider than its column.
+    static func layout(for width: CGFloat) -> (columns: Int, cardWidth: CGFloat) {
+        let available = max(width - padding * 2, minimumCardWidth)
+        let columns = max(1, Int((available + spacing) / (minimumCardWidth + spacing)))
+        let cardWidth = ((available - spacing * CGFloat(columns - 1)) / CGFloat(columns)).rounded(.down)
+        return (columns, cardWidth)
+    }
+
+    var body: some View {
+        GeometryReader { viewport in
+            let layout = Self.layout(for: viewport.size.width)
+            ScrollView {
+                LazyVGrid(columns: Array(repeating: GridItem(.fixed(layout.cardWidth), spacing: Self.spacing),
+                                         count: layout.columns),
+                          alignment: .leading, spacing: 18) {
+                    ForEach(refs) { ref in
+                        ReferenceCard(ref: ref, imageURL: model.imageURL(for: ref),
+                                      selected: model.selectedID == ref.id,
+                                      favicon: { model.favicons[$0] })
+                            .frame(width: layout.cardWidth)
+                            .onTapGesture(count: 2) {
+                                model.selectedID = ref.id
+                                NSWorkspace.shared.open(model.imageURL(for: ref))
+                            }
+                            .simultaneousGesture(TapGesture().onEnded { onToggle(ref) })
+                            .contextMenu { contextMenu(ref) }
+                    }
+                }
+                .padding(Self.padding)
+                // Fill the viewport so clicks below the last row land on the background.
+                .frame(width: viewport.size.width, alignment: .topLeading)
+                .frame(minHeight: viewport.size.height, alignment: .top)
+                .background {
+                    // Behind the cards, so it only receives clicks on empty space.
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture { model.selectedID = nil }
+                }
+            }
+        }
     }
 }
 
@@ -224,6 +259,7 @@ struct ReferenceCard: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(2, reservesSpace: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .task(id: ref.id) {
             image = await Thumbnails.load(imageURL, maxPixelSize: 520)
