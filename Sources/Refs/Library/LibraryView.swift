@@ -18,20 +18,13 @@ struct LibraryView: View {
     var body: some View {
         NavigationSplitView {
             sidebarList
+                .safeAreaInset(edge: .bottom, spacing: 0) { settingsButton }
                 .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
         } detail: {
             grid
-                // Attached to the grid, not the split view, so they stay in the grid's part of the
-                // toolbar and move aside when the details panel opens instead of covering it.
+                // Attached to the grid, not the split view, so it stays in the grid's part of the
+                // toolbar and moves aside when the details panel opens instead of covering it.
                 .searchable(text: $search, placement: .toolbar, prompt: "Search notes, sites, apps")
-                .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        Button(action: openSettings) {
-                            Label("Settings", systemImage: "gearshape")
-                        }
-                        .help("Settings (⌘,)")
-                    }
-                }
                 // The details panel only exists while something is selected.
                 .inspector(isPresented: inspectorPresented) {
                     Group {
@@ -92,6 +85,20 @@ struct LibraryView: View {
     }
 
     // MARK: Sidebar
+
+    /// Pinned below the sidebar's list, like the account or settings row in other Mac sidebars.
+    private var settingsButton: some View {
+        Button(action: openSettings) {
+            Label("Settings", systemImage: "gearshape")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
+        .help("Settings (⌘,)")
+    }
 
     private var sidebarList: some View {
         let summary = SourceSummary(refs: model.refs)
