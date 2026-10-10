@@ -21,6 +21,17 @@ struct LibraryView: View {
                 .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
         } detail: {
             grid
+                // Attached to the grid, not the split view, so they stay in the grid's part of the
+                // toolbar and move aside when the details panel opens instead of covering it.
+                .searchable(text: $search, placement: .toolbar, prompt: "Search notes, sites, apps")
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button(action: openSettings) {
+                            Label("Settings", systemImage: "gearshape")
+                        }
+                        .help("Settings (⌘,)")
+                    }
+                }
                 // The details panel only exists while something is selected.
                 .inspector(isPresented: inspectorPresented) {
                     Group {
@@ -33,15 +44,6 @@ struct LibraryView: View {
                     }
                     .inspectorColumnWidth(min: 280, ideal: 320, max: 420)
                 }
-        }
-        .searchable(text: $search, placement: .toolbar, prompt: "Search notes, sites, apps")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button(action: openSettings) {
-                    Label("Settings", systemImage: "gearshape")
-                }
-                .help("Settings (⌘,)")
-            }
         }
         .frame(minWidth: 700, minHeight: 520)
         .onChange(of: visibleRefs.map(\.id), initial: true) { _, ids in
