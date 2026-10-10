@@ -59,6 +59,13 @@ public struct Selection: Equatable, Sendable {
         anchor = id
     }
 
+    /// Replaces the selection, e.g. with the cards under a drag rectangle. The anchor becomes the
+    /// first selected item in visible order, so a following ⇧-click ranges from there.
+    public mutating func set(_ newIDs: Set<String>, order: [String]) {
+        ids = newIDs
+        anchor = order.first(where: newIDs.contains)
+    }
+
     public mutating func selectAll(_ order: [String]) {
         ids = Set(order)
         anchor = order.first

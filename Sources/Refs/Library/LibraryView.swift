@@ -83,7 +83,7 @@ struct LibraryView: View {
     /// Click selects one card (or clears it if it was the only one), ⌘-click toggles, ⇧-click selects a
     /// range. The second click of a double-click is ignored so opening an image doesn't change the selection.
     private func handleClick(_ ref: Reference) {
-        guard (NSApp.currentEvent?.clickCount ?? 1) <= 1 else { return }
+        guard currentClickCount() <= 1 else { return }
         let flags = NSEvent.modifierFlags
         let modifier: Selection.Modifier = flags.contains(.command) ? .toggle : flags.contains(.shift) ? .extend : .none
         model.selection.click(ref.id, modifier: modifier, order: model.visibleIDs)
@@ -204,16 +204,28 @@ struct LibraryView: View {
 }
 
 /// The scrollable grid of reference cards.
+///
+/// Selection follows Finder: click, ⌘-click and ⇧-click on cards, drag on empty space for a selection
+/// rectangle, and right-click selects the card under the pointer unless it's already selected.
 struct ReferenceGrid: View {
     @ObservedObject var model: LibraryModel
     let refs: [Reference]
     var onClick: (Reference) -> Void = { _ in }
-    @FocusState private var focused: Bool
     var contextMenu: (Reference) -> AnyView = { _ in AnyView(EmptyView()) }
+    @FocusState private var focused: Bool
+    @StateObject private var geometry = GridGeometry()
+    /// The selection rectangle being dragged, in grid coordinates.
+    @State private var marquee: CGRect?
+    /// What was selected when the drag began; kept when ⌘ or ⇧ is held.
+    @State private var marqueeBase: Set<String> = []
 
     static let padding: CGFloat = 16
     static let spacing: CGFloat = 16
     static let minimumCardWidth: CGFloat = 180
+    static let windowIdentifier = NSUserInterfaceItemIdentifier("RefsLibrary")
+    /// The viewport's coordinate space. Card frames, the drag rectangle and right-clicks all use it,
+    /// because in a split view `.global` is per column rather than per window.
+    static let space = "ReferenceGrid"
 
     /// Columns and card width for a given viewport width. Cards get an exact width so nothing inside
     /// them (a wide screenshot, a long title) can make a card wider than its column.
@@ -236,6 +248,12 @@ struct ReferenceGrid: View {
                                       selected: model.selection.contains(ref.id),
                                       favicon: { model.favicons[$0] })
                             .frame(width: layout.cardWidth)
+                            .background {
+                                GeometryReader { card in
+                                    Color.clear.preference(key: CardFramesKey.self,
+                                                           value: [ref.id: card.frame(in: .named(Self.space))])
+                                }
+                            }
                             .onTapGesture(count: 2) {
                                 model.selection.select(ref.id)
                                 NSWorkspace.shared.open(model.imageURL(for: ref))
@@ -248,20 +266,36 @@ struct ReferenceGrid: View {
                     }
                 }
                 .padding(Self.padding)
-                // Fill the viewport so clicks below the last row land on the background.
+                // Fill the viewport so clicks and drags below the last row land on the background.
                 .frame(width: viewport.size.width, alignment: .topLeading)
                 .frame(minHeight: viewport.size.height, alignment: .top)
                 .background {
-                    // Behind the cards, so it only receives clicks on empty space.
+                    // Behind the cards, so it only receives clicks and drags on empty space.
                     Color.clear
                         .contentShape(Rectangle())
                         .onTapGesture {
                             focused = true
                             model.selection.clear()
                         }
+                        .gesture(marqueeGesture)
+                        .contextMenu {
+                            Button("Select All") { model.selectAllVisible() }
+                            if !model.selection.isEmpty {
+                                Button("Deselect All") { model.selection.clear() }
+                            }
+                        }
                 }
             }
+            .overlay { marqueeOverlay }
+            .background(GridAnchor(geometry: geometry))
+            .coordinateSpace(name: Self.space)
         }
+        .onPreferenceChange(CardFramesKey.self) { geometry.cardFrames = $0 }
+        .onAppear {
+            geometry.installRightClickSelection(model: model)
+            model.gridGeometry = geometry
+        }
+        .onDisappear { geometry.removeRightClickSelection() }
         // Focusable so ⌫ deletes the selection; ⌘A comes through Edit › Select All.
         .focusable()
         .focusEffectDisabled()
@@ -271,6 +305,121 @@ struct ReferenceGrid: View {
             model.requestDeletion(of: model.selectedRefs)
             return .handled
         }
+    }
+
+    private var marqueeGesture: some Gesture {
+        DragGesture(minimumDistance: 3, coordinateSpace: .named(Self.space))
+            .onChanged { drag in
+                if marquee == nil {
+                    focused = true
+                    let flags = NSEvent.modifierFlags
+                    marqueeBase = flags.contains(.command) || flags.contains(.shift) ? model.selection.ids : []
+                }
+                let rect = CGRect(x: min(drag.startLocation.x, drag.location.x),
+                                  y: min(drag.startLocation.y, drag.location.y),
+                                  width: abs(drag.location.x - drag.startLocation.x),
+                                  height: abs(drag.location.y - drag.startLocation.y))
+                marquee = rect
+                let hits = geometry.cardFrames.filter { $0.value.intersects(rect) }.keys
+                model.selection.set(marqueeBase.union(hits), order: model.visibleIDs)
+            }
+            .onEnded { _ in
+                marquee = nil
+                marqueeBase = []
+            }
+    }
+
+    /// The translucent rectangle while dragging. The overlay shares the viewport's coordinate space.
+    private var marqueeOverlay: some View {
+        ZStack(alignment: .topLeading) {
+            if let rect = marquee {
+                Rectangle()
+                    .fill(Color.accentColor.opacity(0.15))
+                    .overlay(Rectangle().strokeBorder(Color.accentColor.opacity(0.7), lineWidth: 1))
+                    .frame(width: rect.width, height: rect.height)
+                    .offset(x: rect.minX, y: rect.minY)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .allowsHitTesting(false)
+    }
+}
+
+/// Where each visible card is, in the grid's coordinate space.
+private struct CardFramesKey: PreferenceKey {
+    static let defaultValue: [String: CGRect] = [:]
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue()) { $1 }
+    }
+}
+
+/// Card positions and the right-click monitor. A class, so the event monitor always sees current frames.
+final class GridGeometry: ObservableObject {
+    var cardFrames: [String: CGRect] = [:]
+    /// A flipped view laid exactly under the viewport, for converting window points into grid space.
+    weak var anchor: NSView?
+    private var monitor: Any?
+
+    /// A window point (bottom-left origin) in grid coordinates (top-left origin).
+    func gridPoint(fromWindow point: NSPoint) -> CGPoint? {
+        anchor.map { $0.convert(point, from: nil) }
+    }
+
+    /// The reverse, for tests that synthesize mouse events.
+    func windowPoint(fromGrid point: CGPoint) -> NSPoint? {
+        anchor.map { $0.convert(point, to: nil) }
+    }
+
+    /// Like Finder: right-clicking (or ⌃-clicking) a card that isn't selected selects just that card
+    /// before its menu opens; right-clicking a selected card keeps the whole selection.
+    func installRightClickSelection(model: LibraryModel) {
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown, .leftMouseDown]) { [weak self] event in
+            guard let self,
+                  event.type == .rightMouseDown || event.modifierFlags.contains(.control),
+                  event.window?.identifier == ReferenceGrid.windowIdentifier,
+                  let anchor, event.window === anchor.window,
+                  let point = gridPoint(fromWindow: event.locationInWindow),
+                  anchor.bounds.contains(point)
+            else { return event }
+            selectForContextMenu(at: point, model: model)
+            return event
+        }
+    }
+
+    /// Selects the card under `point` (grid coordinates) unless it's already part of the selection.
+    func selectForContextMenu(at point: CGPoint, model: LibraryModel) {
+        if let id = cardFrames.first(where: { $0.value.contains(point) })?.key, !model.selection.contains(id) {
+            model.selection.select(id)
+        }
+    }
+
+    func removeRightClickSelection() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+    }
+
+    deinit { removeRightClickSelection() }
+}
+
+/// An invisible flipped NSView behind the grid viewport, so AppKit can convert window points into
+/// the same top-left coordinate space SwiftUI uses for the grid.
+private struct GridAnchor: NSViewRepresentable {
+    let geometry: GridGeometry
+
+    func makeNSView(context: Context) -> NSView {
+        let view = FlippedView()
+        geometry.anchor = view
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        geometry.anchor = view
+    }
+
+    private final class FlippedView: NSView {
+        override var isFlipped: Bool { true }
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
     }
 }
 
@@ -482,6 +631,18 @@ private struct StackedThumbnail: View {
             .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.15), lineWidth: 0.5))
             .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
             .task(id: url) { image = await Thumbnails.load(url, maxPixelSize: 520) }
+    }
+}
+
+/// The click count of the event being handled. `NSEvent.clickCount` throws for non-mouse events,
+/// and by the time a SwiftUI gesture ends the current event isn't always a mouse event.
+func currentClickCount() -> Int {
+    guard let event = NSApp.currentEvent else { return 1 }
+    switch event.type {
+    case .leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp, .otherMouseDown, .otherMouseUp:
+        return event.clickCount
+    default:
+        return 1
     }
 }
 

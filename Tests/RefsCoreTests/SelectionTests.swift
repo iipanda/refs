@@ -57,6 +57,19 @@ import Testing
         #expect(selection.ids == ["c", "d", "e"])
     }
 
+    @Test func setReplacesSelectionAndAnchorsAtFirstInOrder() {
+        var selection = Selection()
+        selection.click("a", modifier: .none, order: order)
+        selection.set(["d", "b"], order: order)
+        #expect(selection.ids == ["b", "d"])
+        #expect(selection.anchor == "b")
+        selection.click("c", modifier: .extend, order: order)
+        #expect(selection.ids == ["b", "c"])
+
+        selection.set([], order: order)
+        #expect(selection.isEmpty && selection.anchor == nil)
+    }
+
     @Test func retainDropsHiddenItemsAndStaleAnchor() {
         var selection = Selection()
         selection.click("b", modifier: .none, order: order)

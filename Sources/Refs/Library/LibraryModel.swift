@@ -8,6 +8,8 @@ final class LibraryModel: ObservableObject {
     /// IDs of the cards currently shown, in grid order. Set by the Library view; used for ⇧-click
     /// ranges and Select All.
     var visibleIDs: [String] = []
+    /// The grid's geometry, for debug checks that synthesize mouse events.
+    weak var gridGeometry: GridGeometry?
     /// References waiting for the user to confirm deletion.
     @Published var pendingDeletion: [Reference] = []
 

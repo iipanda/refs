@@ -329,6 +329,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             window.title = "Refs"
             window.isReleasedWhenClosed = false
             window.setFrameAutosaveName("RefsLibrary")
+            window.identifier = ReferenceGrid.windowIdentifier
             window.contentViewController = NSHostingController(rootView: LibraryView(
                 model: library, preferences: preferences, openSettings: { [weak self] in self?.showSettings() }))
             window.delegate = self
@@ -384,6 +385,80 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     #if DEBUG
     /// Renders the main windows to PNGs for visual checks without Screen Recording permission.
+    /// Exercises grid selection with synthesized mouse events and prints the results, to check
+    /// click, drag-to-select and right-click selection without a person at the mouse.
+    private func testMarquee() {
+        guard let window = libraryWindow, let geometry = library.gridGeometry, let anchor = geometry.anchor,
+              let first = library.visibleIDs.first, let firstFrame = geometry.cardFrames[first]
+        else { print("marquee test: grid not ready"); return }
+        func send(_ type: NSEvent.EventType, grid point: CGPoint, flags: NSEvent.ModifierFlags = []) {
+            guard let location = geometry.windowPoint(fromGrid: point),
+                  let event = NSEvent.mouseEvent(with: type, location: location, modifierFlags: flags,
+                                                 timestamp: ProcessInfo.processInfo.systemUptime,
+                                                 windowNumber: window.windowNumber, context: nil, eventNumber: 0,
+                                                 clickCount: 1, pressure: type == .leftMouseUp ? 0 : 1)
+            else { return }
+            NSApp.sendEvent(event)
+        }
+        let order = library.visibleIDs
+        library.selection.clear()
+
+        // 1. Plain click on the first card.
+        let center = CGPoint(x: firstFrame.midX, y: firstFrame.midY)
+        send(.leftMouseDown, grid: center); send(.leftMouseUp, grid: center)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [self] in
+            print("click: \(library.selection.ordered(by: order)) (expected [\(first)])")
+
+            // 2. Right-click logic: on an unselected card it selects that card.
+            if order.count > 1, let second = geometry.cardFrames[order[1]] {
+                geometry.selectForContextMenu(at: CGPoint(x: second.midX, y: second.midY), model: library)
+                print("right-click unselected: \(library.selection.ordered(by: order)) (expected [\(order[1])])")
+                library.selection.selectAll(order)
+                geometry.selectForContextMenu(at: CGPoint(x: second.midX, y: second.midY), model: library)
+                print("right-click within selection keeps \(library.selection.count) of \(order.count)")
+            }
+
+            // 3. Drag from empty space at the bottom-right up to the top-left corner of the grid.
+            library.selection.clear()
+            let start = CGPoint(x: anchor.bounds.maxX - 12, y: anchor.bounds.maxY - 12)
+            let end = CGPoint(x: 4, y: 4)
+            send(.leftMouseDown, grid: start)
+            for step in 1...15 {
+                let t = CGFloat(step) / 15
+                send(.leftMouseDragged, grid: CGPoint(x: start.x + (end.x - start.x) * t, y: start.y + (end.y - start.y) * t))
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [self] in
+                print("drag: selected \(library.selection.count) of \(order.count) visible")
+                send(.leftMouseUp, grid: end)
+            }
+            // 4. A small drag that ends on one card should select only that card. Clear first so the
+            // details panel closes, then measure the current layout.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [self] in library.selection.clear() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [self] in
+                let bounds = anchor.bounds
+                let visible = geometry.cardFrames.filter { bounds.contains($0.value) }
+                // The bottom-most, then right-most fully visible card.
+                guard let (targetID, frame) = visible.max(by: { ($0.value.maxY, $0.value.maxX) < ($1.value.maxY, $1.value.maxX) })
+                else { print("small drag: no visible card"); return }
+                let begin = CGPoint(x: bounds.maxX - 24, y: bounds.maxY - 24)
+                let target = CGPoint(x: frame.midX, y: frame.midY)
+                let rect = CGRect(x: min(begin.x, target.x), y: min(begin.y, target.y),
+                                  width: abs(target.x - begin.x), height: abs(target.y - begin.y))
+                let expected = geometry.cardFrames.filter { $0.value.intersects(rect) }.keys.sorted()
+                send(.leftMouseDown, grid: begin)
+                for step in 1...10 {
+                    let t = CGFloat(step) / 10
+                    send(.leftMouseDragged, grid: CGPoint(x: begin.x + (target.x - begin.x) * t, y: begin.y + (target.y - begin.y) * t))
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [self] in
+                    let got = library.selection.ids.sorted()
+                    print("small drag to \(targetID): selected \(got.count) of \(order.count), matches cards under rectangle: \(got == expected), includes target: \(got.contains(targetID))")
+                    send(.leftMouseUp, grid: target)
+                }
+            }
+        }
+    }
+
     private func snapshotWindows(to dir: URL) {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         func write(_ window: NSWindow?, _ name: String) {
@@ -408,8 +483,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             savePanel = panel
             panel.show()
         }
+        // The drag test needs the Library to be the only grid, since each grid registers its geometry.
+        let testingMarquee = ProcessInfo.processInfo.environment["REFS_TEST_MARQUEE"] == "1"
         // The split view's materials don't render offscreen, so the grid is also drawn on its own.
-        let gridWindows = [520, 760, 1000].map { width -> (NSWindow, Int) in
+        let gridWindows = (testingMarquee ? [] : [520, 760, 1000]).map { width -> (NSWindow, Int) in
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 760),
                                   styleMask: [.titled], backing: .buffered, defer: false)
             window.contentView = NSHostingView(rootView: ReferenceGrid(model: library, refs: library.refs)
@@ -423,20 +500,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         bulk.contentView = NSHostingView(rootView: BulkInspectorView(model: library, refs: Array(library.refs.prefix(3)))
             .frame(width: 320, height: 520)
             .background(Color(nsColor: .windowBackgroundColor)))
-        bulk.orderFront(nil)
+        if !testingMarquee { bulk.orderFront(nil) }
         // A window whose width changes after layout, like when the details panel opens or closes.
         let resized = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1000, height: 760),
                                styleMask: [.titled, .resizable], backing: .buffered, defer: false)
-        resized.contentView = NSHostingView(rootView: ReferenceGrid(model: library, refs: library.refs)
-            .background(Color(nsColor: .windowBackgroundColor)))
-        resized.orderFront(nil)
+        if !testingMarquee { resized.contentView = NSHostingView(rootView: ReferenceGrid(model: library, refs: library.refs)
+            .background(Color(nsColor: .windowBackgroundColor))) }
+        if !testingMarquee { resized.orderFront(nil) }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.3
                 resized.animator().setFrame(NSRect(x: 0, y: 0, width: 700, height: 760), display: true)
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [self] in
+        if ProcessInfo.processInfo.environment["REFS_TEST_MARQUEE"] == "1" {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [self] in
+                // Clicks only reach SwiftUI gestures in the key window.
+                NSApp.activate(ignoringOtherApps: true)
+                libraryWindow?.makeKeyAndOrderFront(nil)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [self] in testMarquee() }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + (testingMarquee ? 5 : 3)) { [self] in
             for (window, width) in gridWindows { write(window, "grid-\(width).png") }
             write(resized, "grid-resized-700.png")
             write(bulk, "bulk-inspector.png")
