@@ -1,251 +1,246 @@
 import Foundation
+import CoreFoundation
 import RefsCore
 
-/// A minimal, read-only MCP server over newline-delimited JSON-RPC (the stdio transport).
-///
-/// It implements only what the reference library needs: `initialize`, `ping`, `tools/list` and
-/// `tools/call`. Notifications are accepted and ignored.
+/// Reference-management MCP over newline-delimited JSON-RPC.
 public final class MCPServer {
     public static let supportedProtocolVersions = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"]
     public static let defaultImageSize = 1024
-
     private let store: LibraryStore
     private let version: String
 
-    public init(store: LibraryStore, version: String = "0.1.0") {
-        self.store = store
-        self.version = version
-    }
+    public init(store: LibraryStore, version: String = "0.2.0") { self.store = store; self.version = version }
 
-    /// Handles one JSON-RPC message. Returns the serialized response, or `nil` for notifications.
-    public func handle(_ line: Data) -> Data? {
-        guard let object = try? JSONSerialization.jsonObject(with: line),
-              let message = object as? [String: Any]
-        else {
+    public func handle(_ line: Data) async -> Data? {
+        guard let message = (try? JSONSerialization.jsonObject(with: line)) as? [String: Any] else {
             return encode(errorResponse(id: NSNull(), code: -32700, message: "Parse error"))
         }
-        guard let method = message["method"] as? String else {
-            // A response or malformed message. Nothing to answer.
-            return nil
-        }
-        guard let id = message["id"], !(id is NSNull) else {
-            // Notification, e.g. notifications/initialized.
-            return nil
-        }
+        guard let method = message["method"] as? String, let id = message["id"], !(id is NSNull) else { return nil }
         let params = message["params"] as? [String: Any] ?? [:]
-
         let response: [String: Any]
         switch method {
-        case "initialize":
-            response = result(id: id, initialize(params))
-        case "ping":
-            response = result(id: id, [:])
-        case "tools/list":
-            response = result(id: id, ["tools": Self.tools])
-        case "tools/call":
-            response = callTool(id: id, params: params)
-        default:
-            response = errorResponse(id: id, code: -32601, message: "Method not found: \(method)")
+        case "initialize": response = result(id: id, initialize(params))
+        case "ping": response = result(id: id, [:])
+        case "tools/list": response = result(id: id, ["tools": Self.tools])
+        case "tools/call": response = await callTool(id: id, params: params)
+        default: response = errorResponse(id: id, code: -32601, message: "Method not found: \(method)")
         }
         return encode(response)
     }
 
-    // MARK: - Methods
-
     private func initialize(_ params: [String: Any]) -> [String: Any] {
         let requested = params["protocolVersion"] as? String
-        let version = requested.flatMap { Self.supportedProtocolVersions.contains($0) ? $0 : nil }
-            ?? Self.supportedProtocolVersions[0]
         return [
-            "protocolVersion": version,
+            "protocolVersion": requested.flatMap { Self.supportedProtocolVersions.contains($0) ? $0 : nil } ?? Self.supportedProtocolVersions[0],
             "capabilities": ["tools": ["listChanged": false]],
-            "serverInfo": ["name": "refs", "title": "Refs design references", "version": self.version],
+            "serverInfo": ["name": "refs", "title": "Refs design references", "version": version],
             "instructions": """
-                Refs is the user's personal library of UI screenshots they saved as design references. \
-                Each reference records the source app or website and a short note about what the user \
-                likes in it. When the user asks for a design, use list_references (filter by app, site or \
-                text) to find relevant references, then get_reference to see the image. Treat the notes \
-                as the user's stated taste and follow them.
+                Refs is the user's personal library of UI screenshots and videos with source metadata \
+                and notes about what they like. Use list_references and get_reference for design inspiration. \
+                Add local files with add_references. Check get_library_info for the active library path. \
+                Read the current revision before update_reference. Removal uses recoverable \
+                trash_references and restore_references. Treat notes as the user's stated taste.
                 """,
         ]
     }
 
-    private func callTool(id: Any, params: [String: Any]) -> [String: Any] {
+    private func callTool(id: Any, params: [String: Any]) async -> [String: Any] {
         guard let name = params["name"] as? String else {
             return errorResponse(id: id, code: -32602, message: "Missing tool name")
         }
-        let args = params["arguments"] as? [String: Any] ?? [:]
-        switch name {
-        case "list_references":
-            return result(id: id, listReferences(args))
-        case "get_reference":
-            return result(id: id, getReference(args))
-        case "list_sources":
-            return result(id: id, listSources())
-        default:
+        guard let definition = Self.tools.first(where: { $0["name"] as? String == name }) else {
             return errorResponse(id: id, code: -32602, message: "Unknown tool: \(name)")
         }
-    }
-
-    // MARK: - Tools
-
-    private func listReferences(_ args: [String: Any]) -> [String: Any] {
-        let limit = min(max(intArg(args["limit"]) ?? 20, 1), 100)
-        let all = store.loadAll()
-        let query = ReferenceQuery(
-            text: args["query"] as? String,
-            app: args["app"] as? String,
-            site: args["site"] as? String
-        )
-        let matched = query.apply(to: all)
-        let shown = Array(matched.prefix(limit))
-
-        guard !shown.isEmpty else {
-            let hint = all.isEmpty
-                ? "The library is empty. The user hasn't saved any references yet."
-                : "No references match. Call list_sources to see which apps and sites have references."
-            return textResult(hint)
-        }
-        var lines = ["\(matched.count) reference\(matched.count == 1 ? "" : "s") found, showing \(shown.count). Call get_reference with an id to see the image.", ""]
-        for ref in shown {
-            lines.append(describe(ref))
-            lines.append("")
-        }
-        return textResult(lines.joined(separator: "\n"))
-    }
-
-    private func getReference(_ args: [String: Any]) -> [String: Any] {
-        guard let id = args["id"] as? String, let ref = store.reference(id: id) else {
-            return toolError("No reference with id \(String(describing: args["id"] ?? "nil")). Use list_references to find ids.")
-        }
-        let includeImage = args["include_image"] as? Bool ?? true
-        let maxSize = min(max(intArg(args["max_size"]) ?? Self.defaultImageSize, 128), 4096)
-
-        var content: [[String: Any]] = [["type": "text", "text": describe(ref)]]
-        if includeImage {
-            if let png = ImageCoding.downscaledPNG(at: store.imageURL(for: ref), maxPixelSize: maxSize) {
-                content.append(["type": "image", "data": png.base64EncodedString(), "mimeType": "image/png"])
-            } else {
-                content.append(["type": "text", "text": "The image file could not be read."])
+        do {
+            guard params["arguments"] == nil || params["arguments"] is [String: Any] else {
+                throw LibraryError.invalidInput("arguments must be an object.")
             }
+            let args = params["arguments"] as? [String: Any] ?? [:]
+            try ToolValidation.validate(args, schema: definition["inputSchema"] as! [String: Any])
+            let output: [String: Any]
+            switch name {
+            case "list_references": output = try listReferences(args)
+            case "get_reference": output = try getReference(args)
+            case "list_sources": output = try listSources()
+            case "get_library_info": output = try libraryInfo()
+            case "add_references": output = await addReferences(args)
+            case "update_reference":
+                let ref = try store.patch(id: args["id"] as! String,
+                    patch: parsePatch(args["patch"] as! [String: Any]), expectedRevision: args["expected_revision"] as! Int)
+                output = textResult(describe(ref), structured: ["reference": metadata(ref)])
+            case "trash_references": output = changeTrash(args, trashed: true)
+            case "restore_references": output = changeTrash(args, trashed: false)
+            default: throw LibraryError.invalidInput("Unknown tool.")
+            }
+            return result(id: id, output)
+        } catch {
+            return result(id: id, ["content": [["type": "text", "text": error.localizedDescription]],
+                "structuredContent": ["error": errorMetadata(error)], "isError": true])
         }
-        return ["content": content, "isError": false]
     }
 
-    private func listSources() -> [String: Any] {
-        let summary = SourceSummary(refs: store.loadAll())
-        guard !summary.apps.isEmpty || !summary.sites.isEmpty else {
-            return textResult("The library is empty.")
+    private struct PageCursor: Codable { var time: Double; var id: String }
+
+    private func listReferences(_ args: [String: Any]) throws -> [String: Any] {
+        let limit = args["limit"] as? Int ?? 20
+        let all = try store.readAll(includeTrashed: args["include_trashed"] as? Bool ?? false)
+        let query = ReferenceQuery(text: args["query"] as? String, app: args["app"] as? String, site: args["site"] as? String)
+        var matched = query.apply(to: all)
+        if let kind = args["kind"] as? String { matched = matched.filter { $0.isVideo == (kind == "video") } }
+        let total = matched.count
+        if let cursor = args["cursor"] as? String {
+            guard let data = Data(base64Encoded: cursor), let boundary = try? JSONDecoder().decode(PageCursor.self, from: data) else {
+                throw LibraryError.invalidInput("Invalid pagination cursor.")
+            }
+            matched = matched.filter { $0.createdAt.timeIntervalSince1970 < boundary.time ||
+                ($0.createdAt.timeIntervalSince1970 == boundary.time && $0.id < boundary.id) }
         }
+        let shown = Array(matched.prefix(limit))
+        var next: Any = NSNull()
+        if matched.count > shown.count, let last = shown.last {
+            next = try JSONEncoder().encode(PageCursor(time: last.createdAt.timeIntervalSince1970, id: last.id)).base64EncodedString()
+        }
+        let structured: [String: Any] = ["references": shown.map(metadata), "total": total, "next_cursor": next]
+        if shown.isEmpty {
+            return textResult(all.isEmpty ? "The library is empty. The user hasn't saved any references yet."
+                : "No references match. Call list_sources to see which apps and sites have references.", structured: structured)
+        }
+        let header = "\(total) reference\(total == 1 ? "" : "s") found, showing \(shown.count). Call get_reference with an id to see the image."
+        return textResult(header + "\n\n" + shown.map(describe).joined(separator: "\n\n"), structured: structured)
+    }
+
+    private func getReference(_ args: [String: Any]) throws -> [String: Any] {
+        let ref = try store.readReference(id: args["id"] as! String)
+        var output = textResult(describe(ref), structured: ["reference": metadata(ref)])
+        if args["include_image"] as? Bool ?? true {
+            guard let png = ImageCoding.downscaledPNG(at: store.imageURL(for: ref), maxPixelSize: args["max_size"] as? Int ?? Self.defaultImageSize) else {
+                throw LibraryError.invalidInput("The image file could not be read.")
+            }
+            var content = output["content"] as! [[String: Any]]
+            content.append(["type": "image", "data": png.base64EncodedString(), "mimeType": "image/png"])
+            output["content"] = content
+        }
+        return output
+    }
+
+    private func listSources() throws -> [String: Any] {
+        let summary = SourceSummary(refs: try store.readAll())
+        let structured: [String: Any] = [
+            "apps": summary.apps.map { ["name": $0.name, "bundle_id": $0.bundleID as Any? ?? NSNull(), "count": $0.count] },
+            "sites": summary.sites.map { ["name": $0.name, "count": $0.count] }]
+        guard !summary.apps.isEmpty || !summary.sites.isEmpty else { return textResult("The library is empty.", structured: structured) }
         var lines: [String] = []
-        if !summary.sites.isEmpty {
-            lines.append("Websites (filter with site):")
-            lines += summary.sites.map { "- \($0.name) (\($0.count))" }
-        }
+        if !summary.sites.isEmpty { lines.append("Websites (filter with site):"); lines += summary.sites.map { "- \($0.name) (\($0.count))" } }
         if !summary.apps.isEmpty {
             if !lines.isEmpty { lines.append("") }
             lines.append("Apps (filter with app):")
-            lines += summary.apps.map { entry in
-                "- \(entry.name)\(entry.bundleID.map { " [\($0)]" } ?? "") (\(entry.count))"
-            }
+            lines += summary.apps.map { "- \($0.name)\($0.bundleID.map { " [\($0)]" } ?? "") (\($0.count))" }
         }
-        return textResult(lines.joined(separator: "\n"))
+        return textResult(lines.joined(separator: "\n"), structured: structured)
     }
 
-    // MARK: - Formatting
+    private func libraryInfo() throws -> [String: Any] {
+        let refs = try store.readAll(includeTrashed: true)
+        let info: [String: Any] = ["path": store.root.path, "active_count": refs.filter { !$0.isTrashed }.count,
+            "trashed_count": refs.filter(\.isTrashed).count, "supported_formats": ReferenceAdder.supportedFormats]
+        return textResult("Library: \(store.root.path)\n\(info["active_count"]!) active, \(info["trashed_count"]!) trashed references.", structured: info)
+    }
+
+    private func addReferences(_ args: [String: Any]) async -> [String: Any] {
+        var results: [[String: Any]] = []
+        for item in args["items"] as! [[String: Any]] {
+            let path = item["path"] as! String
+            do {
+                let source = try parseSource(item["source"] as? [String: Any] ?? [:])
+                let addition = try await ReferenceAdder.add(path: path, note: item["note"] as? String ?? "",
+                    title: item["title"] as? String, source: source, store: store)
+                results.append(["path": path, "status": addition.added ? "added" : "existing", "reference": metadata(addition.reference)])
+            } catch { results.append(["path": path, "status": "failed", "error": errorMetadata(error)]) }
+        }
+        return batchResult(results)
+    }
+
+    private func changeTrash(_ args: [String: Any], trashed: Bool) -> [String: Any] {
+        let results = (args["ids"] as! [String]).map { id -> [String: Any] in
+            do { return ["id": id, "status": trashed ? "trashed" : "restored", "reference": metadata(try store.setTrashed(id: id, trashed: trashed))] }
+            catch { return ["id": id, "status": "failed", "error": errorMetadata(error)] }
+        }
+        return batchResult(results)
+    }
+
+    private func batchResult(_ results: [[String: Any]]) -> [String: Any] {
+        let failed = results.filter { $0["status"] as? String == "failed" }.count
+        var output = textResult(results.map { "\($0["path"] ?? $0["id"] ?? ""): \($0["status"]!)" }.joined(separator: "\n"),
+            structured: ["results": results, "succeeded": results.count - failed, "failed": failed])
+        output["isError"] = failed == results.count
+        return output
+    }
+
+    private func parseSource(_ source: [String: Any]) throws -> ReferencePatch {
+        ReferencePatch(app: source["app"] as? String, bundleID: try field(source, "bundle_id"), url: try field(source, "url"))
+    }
+    private func parsePatch(_ input: [String: Any]) throws -> ReferencePatch {
+        var patch = try parseSource(input["source"] as? [String: Any] ?? [:])
+        patch.note = input["note"] as? String
+        patch.title = try field(input, "title")
+        return patch
+    }
+    private func field(_ input: [String: Any], _ key: String) throws -> FieldChange<String>? {
+        guard let value = input[key] else { return nil }
+        if value is NSNull { return .clear }
+        guard let string = value as? String else { throw LibraryError.invalidInput("\(key) must be a string or null.") }
+        return .set(string)
+    }
+
+    private func metadata(_ ref: Reference) -> [String: Any] {
+        var output: [String: Any] = ["id": ref.id, "revision": ref.revision, "kind": ref.isVideo ? "video" : "image",
+            "title": ref.title as Any? ?? NSNull(), "note": ref.note,
+            "source": ["app": ref.app.name, "bundle_id": ref.app.bundleID as Any? ?? NSNull(), "url": ref.web?.url as Any? ?? NSNull()],
+            "created_at": Self.dateFormatter.string(from: ref.createdAt), "pixel_width": ref.pixelWidth, "pixel_height": ref.pixelHeight,
+            "duration": ref.duration as Any? ?? NSNull(), "media_path": store.mediaURL(for: ref).path,
+            "poster_path": store.imageURL(for: ref).path, "trashed": ref.isTrashed,
+            "trashed_at": ref.trashedAt.map(Self.dateFormatter.string) as Any? ?? NSNull()]
+        if let provenance = ref.provenance {
+            output["provenance"] = ["added_at": Self.dateFormatter.string(from: provenance.addedAt),
+                "original_path": provenance.originalPath, "original_filename": provenance.originalFilename]
+        }
+        return output
+    }
+
+    private func errorMetadata(_ error: Error) -> [String: Any] {
+        var result: [String: Any] = ["code": "io_error", "message": error.localizedDescription]
+        if let library = error as? LibraryError {
+            switch library {
+            case .invalidInput: result["code"] = "invalid_input"
+            case .notFound: result["code"] = "not_found"
+            case .conflict(let ref): result["code"] = "revision_conflict"; result["current_reference"] = metadata(ref)
+            }
+        }
+        return result
+    }
 
     private func describe(_ ref: Reference) -> String {
-        var lines = ["id: \(ref.id)"]
+        var lines = ["id: \(ref.id)", "revision: \(ref.revision)", "state: \(ref.isTrashed ? "trashed" : "active")"]
         if let web = ref.web {
             lines.append("source: \(web.host ?? web.url) (in \(ref.app.name))")
             lines.append("url: \(web.url)")
-        } else {
-            lines.append("source: \(ref.app.name)\(ref.app.bundleID.map { " [\($0)]" } ?? "")")
-        }
+        } else { lines.append("source: \(ref.app.name)\(ref.app.bundleID.map { " [\($0)]" } ?? "")") }
         if let title = ref.title { lines.append("title: \(title)") }
         let note = ref.note.trimmingCharacters(in: .whitespacesAndNewlines)
         lines.append("what the user likes: \(note.isEmpty ? "(no note)" : note)")
-        lines.append("captured: \(Self.dateFormatter.string(from: ref.createdAt)), \(ref.pixelWidth)×\(ref.pixelHeight) px")
-        lines.append("file: \(store.imageURL(for: ref).path)")
+        lines.append("\(ref.provenance == nil ? "captured" : "added"): \(Self.dateFormatter.string(from: ref.createdAt)), \(ref.pixelWidth)×\(ref.pixelHeight) px")
+        lines.append("type: \(ref.isVideo ? "video" : "screenshot")")
+        if let duration = ref.duration { lines.append("duration: \(String(format: "%.1f", duration)) seconds") }
+        lines.append("file: \(store.mediaURL(for: ref).path)")
+        if ref.isVideo { lines.append("The included image is a poster frame; open the video file to inspect motion.") }
         return lines.joined(separator: "\n")
     }
 
-    private static let dateFormatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter
-    }()
-
-    // MARK: - JSON-RPC helpers
-
-    private func intArg(_ value: Any?) -> Int? {
-        if let int = value as? Int { return int }
-        if let double = value as? Double { return Int(double) }
-        if let string = value as? String { return Int(string) }
-        return nil
+    private static let dateFormatter: ISO8601DateFormatter = { let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime]; return f }()
+    private func textResult(_ text: String, structured: [String: Any] = [:]) -> [String: Any] {
+        ["content": [["type": "text", "text": text]], "structuredContent": structured, "isError": false]
     }
-
-    private func textResult(_ text: String) -> [String: Any] {
-        ["content": [["type": "text", "text": text]], "isError": false]
-    }
-
-    private func toolError(_ text: String) -> [String: Any] {
-        ["content": [["type": "text", "text": text]], "isError": true]
-    }
-
-    private func result(id: Any, _ result: [String: Any]) -> [String: Any] {
-        ["jsonrpc": "2.0", "id": id, "result": result]
-    }
-
-    private func errorResponse(id: Any, code: Int, message: String) -> [String: Any] {
-        ["jsonrpc": "2.0", "id": id, "error": ["code": code, "message": message]]
-    }
-
-    private func encode(_ object: [String: Any]) -> Data? {
-        try? JSONSerialization.data(withJSONObject: object, options: [.withoutEscapingSlashes])
-    }
-
-    // MARK: - Tool definitions
-
-    static let tools: [[String: Any]] = [
-        [
-            "name": "list_references",
-            "title": "List design references",
-            "description": "Search the user's saved UI design references. Returns id, source app or website, page title, the user's note on what they like, and the image file path. Text only; use get_reference to see an image.",
-            "inputSchema": [
-                "type": "object",
-                "properties": [
-                    "query": ["type": "string", "description": "Words to match in notes, titles, URLs and app names. All words must match."],
-                    "app": ["type": "string", "description": "App name or bundle ID, e.g. \"Linear\" or \"com.figma.Desktop\"."],
-                    "site": ["type": "string", "description": "Website host, e.g. \"stripe.com\". Subdomains match too."],
-                    "limit": ["type": "integer", "description": "Maximum results, 1–100. Default 20.", "minimum": 1, "maximum": 100],
-                ],
-                "additionalProperties": false,
-            ],
-            "annotations": ["readOnlyHint": true, "openWorldHint": false],
-        ],
-        [
-            "name": "get_reference",
-            "title": "Get a design reference",
-            "description": "Get one saved reference by id, including the screenshot as an image (downscaled to max_size pixels on the longest edge).",
-            "inputSchema": [
-                "type": "object",
-                "properties": [
-                    "id": ["type": "string", "description": "Reference id from list_references."],
-                    "include_image": ["type": "boolean", "description": "Include the screenshot. Default true."],
-                    "max_size": ["type": "integer", "description": "Longest image edge in pixels, 128–4096. Default 1024.", "minimum": 128, "maximum": 4096],
-                ],
-                "required": ["id"],
-                "additionalProperties": false,
-            ],
-            "annotations": ["readOnlyHint": true, "openWorldHint": false],
-        ],
-        [
-            "name": "list_sources",
-            "title": "List reference sources",
-            "description": "List the websites and apps the user has saved references from, with counts.",
-            "inputSchema": ["type": "object", "properties": [String: Any](), "additionalProperties": false],
-            "annotations": ["readOnlyHint": true, "openWorldHint": false],
-        ],
-    ]
+    private func result(id: Any, _ output: [String: Any]) -> [String: Any] { ["jsonrpc": "2.0", "id": id, "result": output] }
+    private func errorResponse(id: Any, code: Int, message: String) -> [String: Any] { ["jsonrpc": "2.0", "id": id, "error": ["code": code, "message": message]] }
+    private func encode(_ value: [String: Any]) -> Data? { try? JSONSerialization.data(withJSONObject: value, options: [.withoutEscapingSlashes]) }
 }

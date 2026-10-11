@@ -48,7 +48,7 @@ public struct ReferenceQuery: Sendable {
     }
 
     static func searchableText(_ ref: Reference) -> String {
-        [ref.note, ref.app.name, ref.app.bundleID, ref.windowTitle, ref.web?.title, ref.web?.url]
+        [ref.note, ref.customTitle, ref.app.name, ref.app.bundleID, ref.windowTitle, ref.web?.title, ref.web?.url]
             .compactMap { $0 }
             .joined(separator: "\n")
             .lowercased()

@@ -6,6 +6,20 @@ public struct Reference: Codable, Identifiable, Hashable, Sendable {
     public var createdAt: Date
     /// Image file name, relative to the library folder.
     public var imageFile: String
+    /// Optional movie; imageFile is its poster when present. Missing on older screenshot sidecars.
+    public var videoFile: String?
+    public var duration: Double?
+    public var customTitle: String?
+    public var fingerprint: String?
+    public var provenance: ReferenceProvenance?
+    public var trashedAt: Date?
+    private var savedRevision: Int?
+    public var revision: Int {
+        get { savedRevision ?? 1 }
+        set { savedRevision = newValue }
+    }
+    public var isTrashed: Bool { trashedAt != nil }
+    public var isVideo: Bool { videoFile != nil }
     public var pixelWidth: Int
     public var pixelHeight: Int
     public var app: SourceApp
@@ -25,7 +39,9 @@ public struct Reference: Codable, Identifiable, Hashable, Sendable {
         app: SourceApp,
         windowTitle: String? = nil,
         web: WebSource? = nil,
-        note: String = ""
+        note: String = "",
+        videoFile: String? = nil,
+        duration: Double? = nil
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -36,9 +52,13 @@ public struct Reference: Codable, Identifiable, Hashable, Sendable {
         self.windowTitle = windowTitle
         self.web = web
         self.note = note
+        self.videoFile = videoFile
+        self.duration = duration
     }
 
     enum CodingKeys: String, CodingKey {
+        case videoFile, duration, customTitle, fingerprint, provenance, trashedAt
+        case savedRevision = "revision"
         case id, createdAt, imageFile, pixelWidth, pixelHeight, app, windowTitle, web
         case note = "description"
     }
@@ -50,7 +70,7 @@ public struct Reference: Codable, Identifiable, Hashable, Sendable {
 
     /// Best available title: page title, then window title.
     public var title: String? {
-        let candidates = [web?.title, windowTitle]
+        let candidates = [customTitle, web?.title, windowTitle]
         return candidates.compactMap { $0 }.first { !$0.isEmpty }
     }
 }
@@ -86,5 +106,16 @@ public struct WebSource: Codable, Hashable, Sendable {
         let withScheme = trimmed.contains("://") ? trimmed : "https://" + trimmed
         guard let host = URLComponents(string: withScheme)?.host, !host.isEmpty else { return nil }
         return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+    }
+}
+
+public struct ReferenceProvenance: Codable, Hashable, Sendable {
+    public var addedAt: Date
+    public var originalPath: String
+    public var originalFilename: String
+    public init(addedAt: Date, originalPath: String, originalFilename: String) {
+        self.addedAt = addedAt
+        self.originalPath = originalPath
+        self.originalFilename = originalFilename
     }
 }

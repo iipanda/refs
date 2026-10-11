@@ -69,7 +69,8 @@ func solidImage(width: Int, height: Int) -> CGImage {
 
         try store.delete(id: ref.id)
         #expect(store.loadAll().isEmpty)
-        #expect(!FileManager.default.fileExists(atPath: store.imageURL(for: ref).path))
+        #expect(FileManager.default.fileExists(atPath: store.imageURL(for: ref).path))
+        #expect(store.reference(id: ref.id)?.isTrashed == true)
     }
 
     @Test func rejectsPathTraversalIDs() {
@@ -78,6 +79,58 @@ func solidImage(width: Int, height: Int) -> CGImage {
         #expect(!LibraryStore.isValidID("a/b"))
         #expect(!LibraryStore.isValidID(""))
         #expect(LibraryStore.isValidID("20261009-104312-a1b2"))
+    }
+
+    @Test func videoRoundTripAndDeletionRetainPosterAndMovie() throws {
+        let store = makeTempLibrary()
+        defer { try? FileManager.default.removeItem(at: store.root) }
+        let source = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mp4")
+        defer { try? FileManager.default.removeItem(at: source) }
+        let movie = Data([1, 2, 3, 4]) // Storage treats an already finalized movie as opaque bytes.
+        try movie.write(to: source)
+        let png = try #require(ImageCoding.pngData(from: solidImage(width: 40, height: 20)))
+        let saved = try store.add(pngData: png, pixelWidth: 40, pixelHeight: 20,
+            app: SourceApp(name: "Safari", bundleID: nil), windowTitle: "Animation", web: nil,
+            note: "Spring motion", videoURL: source, duration: 2.5)
+        #expect(saved.isVideo)
+        #expect(saved.duration == 2.5)
+        #expect(store.loadAll() == [saved])
+        #expect(try Data(contentsOf: store.mediaURL(for: saved)) == movie)
+        #expect(ImageCoding.thumbnail(at: store.imageURL(for: saved), maxPixelSize: 128) != nil)
+        try store.delete(id: saved.id)
+        #expect(FileManager.default.fileExists(atPath: store.imageURL(for: saved).path))
+        #expect(FileManager.default.fileExists(atPath: store.mediaURL(for: saved).path))
+        #expect(store.reference(id: saved.id)?.isTrashed == true)
+        #expect(FileManager.default.fileExists(atPath: source.path))
+    }
+
+    @Test func missingMovieIsSkippedAndFailedImportLeavesNoFiles() throws {
+        let store = makeTempLibrary()
+        defer { try? FileManager.default.removeItem(at: store.root) }
+        let png = try #require(ImageCoding.pngData(from: solidImage(width: 4, height: 4)))
+        let missing = store.root.appendingPathComponent("missing.mp4")
+        #expect(throws: (any Error).self) {
+            try store.add(pngData: png, pixelWidth: 4, pixelHeight: 4,
+                app: SourceApp(name: "Test", bundleID: nil), windowTitle: nil, web: nil,
+                note: "", videoURL: missing)
+        }
+        #expect(try FileManager.default.contentsOfDirectory(atPath: store.root.path).filter { $0 != ".library.lock" }.isEmpty)
+        let screenshot = try store.add(pngData: png, pixelWidth: 4, pixelHeight: 4,
+            app: SourceApp(name: "Test", bundleID: nil), windowTitle: nil, web: nil, note: "")
+        var video = screenshot
+        video.videoFile = "missing.mp4"
+        try store.update(video)
+        #expect(store.loadAll().isEmpty)
+    }
+
+    @Test func oldScreenshotSidecarsDecodeWithoutVideoFields() throws {
+        let ref = Reference(id: "old", createdAt: Date(), imageFile: "old.png", pixelWidth: 1,
+            pixelHeight: 1, app: SourceApp(name: "Test", bundleID: nil))
+        let data = try LibraryStore.encoder.encode(ref)
+        let decoded = try LibraryStore.decoder.decode(Reference.self, from: data)
+        #expect(!decoded.isVideo)
+        #expect(decoded.videoFile == nil)
+        #expect(decoded.duration == nil)
     }
 
     @Test func idsAreChronological() {

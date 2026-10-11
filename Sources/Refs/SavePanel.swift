@@ -1,6 +1,7 @@
 import AppKit
 import RefsCore
 import SwiftUI
+import AVKit
 
 /// Editable state for one capture waiting to be saved.
 final class SaveDraft: ObservableObject {
@@ -152,10 +153,12 @@ struct SaveView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Image(nsImage: draft.preview)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(maxWidth: .infinity, maxHeight: 210)
+            Group {
+                if let url = draft.capture.videoURL { MoviePreview(url: url) }
+                else { Image(nsImage: draft.preview).resizable().aspectRatio(contentMode: .fit) }
+            }
+                .frame(maxWidth: .infinity)
+                .frame(height: 210)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator))
 
@@ -316,5 +319,22 @@ struct BrowserAccessBanner: View {
         .padding(10)
         .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(tint.opacity(0.35)))
+    }
+}
+
+/// Native macOS playback controls, with a player owned by the preview view.
+struct MoviePreview: NSViewRepresentable {
+    let url: URL
+    func makeNSView(context: Context) -> AVPlayerView {
+        let view = AVPlayerView()
+        view.controlsStyle = .inline
+        view.videoGravity = .resizeAspect
+        view.player = AVPlayer(url: url)
+        return view
+    }
+    func updateNSView(_ view: AVPlayerView, context: Context) {}
+    static func dismantleNSView(_ view: AVPlayerView, coordinator: ()) {
+        view.player?.pause()
+        view.player = nil
     }
 }

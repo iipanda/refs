@@ -4,6 +4,11 @@ import RefsCore
 /// The app's in-memory view of the library folder.
 final class LibraryModel: ObservableObject {
     @Published private(set) var refs: [Reference] = []
+    @Published private(set) var trashRefs: [Reference] = []
+    @Published var libraryError: String?
+    private var watcher: LibraryWatcher?
+    struct NoteDraft { var note: String; var revision: Int }
+    var noteDrafts: [String: NoteDraft] = [:]
     @Published var selection = Selection()
     /// IDs of the cards currently shown, in grid order. Set by the Library view; used for ⇧-click
     /// ranges and Select All.
@@ -34,6 +39,7 @@ final class LibraryModel: ObservableObject {
         store = LibraryStore(root: root)
         faviconCache = FaviconCache(libraryRoot: root)
         reload()
+        watchLibrary()
     }
 
     func changeRoot(_ root: URL) {
@@ -41,12 +47,26 @@ final class LibraryModel: ObservableObject {
         faviconCache = FaviconCache(libraryRoot: root)
         favicons = [:]
         selection.clear()
+        noteDrafts = [:]
         reload()
+        watchLibrary()
+    }
+
+    private func watchLibrary() {
+        watcher = nil
+        do { watcher = try LibraryWatcher(root: store.root) { [weak self] in self?.reload() } }
+        catch { libraryError = error.localizedDescription }
     }
 
     func reload() {
-        refs = store.loadAll()
-        loadFavicons()
+        do {
+            let all = try store.readAll(includeTrashed: true)
+            let active = all.filter { !$0.isTrashed }
+            let trash = all.filter(\.isTrashed)
+            if refs != active { refs = active }
+            if trashRefs != trash { trashRefs = trash }
+            loadFavicons()
+        } catch { libraryError = error.localizedDescription }
     }
 
     /// Shows cached icons right away and fetches missing ones in the background, one request per site.
@@ -76,7 +96,7 @@ final class LibraryModel: ObservableObject {
 
     func reference(id: String?) -> Reference? {
         guard let id else { return nil }
-        return refs.first { $0.id == id }
+        return (refs + trashRefs).first { $0.id == id }
     }
 
     func add(_ draft: SaveDraft) throws -> Reference {
@@ -92,27 +112,43 @@ final class LibraryModel: ObservableObject {
             app: draft.app,
             windowTitle: web == nil ? draft.windowTitle : capture.windowTitle,
             web: web,
-            note: draft.note.trimmingCharacters(in: .whitespacesAndNewlines)
+            note: draft.note.trimmingCharacters(in: .whitespacesAndNewlines),
+            videoURL: capture.videoURL,
+            duration: capture.videoDuration
         )
         refs.insert(ref, at: 0)
         loadFavicons()
         return ref
     }
 
-    func updateNote(id: String, note: String) {
-        guard let index = refs.firstIndex(where: { $0.id == id }), refs[index].note != note else { return }
-        refs[index].note = note
-        try? store.update(refs[index])
+    @discardableResult
+    func updateNote(id: String, note: String, expectedRevision: Int) throws -> Reference {
+        do {
+            let ref = try store.patch(id: id, patch: ReferencePatch(note: note), expectedRevision: expectedRevision)
+            reload()
+            return ref
+        } catch {
+            reload()
+            throw error
+        }
     }
 
-    func delete(id: String) {
-        delete(ids: [id])
-    }
-
+    func delete(id: String) { delete(ids: [id]) }
     func delete(ids: Set<String>) {
-        for id in ids { try? store.delete(id: id) }
-        refs.removeAll { ids.contains($0.id) }
+        for id in ids {
+            do { try store.delete(id: id) }
+            catch { libraryError = error.localizedDescription }
+        }
+        reload()
         selection.retain(refs.map(\.id))
+    }
+    func restore(ids: Set<String>) {
+        for id in ids {
+            do { _ = try store.setTrashed(id: id, trashed: false) }
+            catch { libraryError = error.localizedDescription }
+        }
+        reload()
+        selection.retain(trashRefs.map(\.id))
     }
 
     /// Asks the Library view to confirm deleting these references.
@@ -125,8 +161,8 @@ final class LibraryModel: ObservableObject {
         selection.selectAll(visibleIDs)
     }
 
-    func imageURL(for ref: Reference) -> URL {
-        store.imageURL(for: ref)
+    func mediaURL(for ref: Reference) -> URL {
+        store.mediaURL(for: ref)
     }
 
     /// Text for pasting into an agent prompt. Agents with the MCP server can fetch it by id;
@@ -140,7 +176,7 @@ final class LibraryModel: ObservableObject {
         }
         if let title = ref.title { parts.append("title: \(title)") }
         if !ref.note.isEmpty { parts.append("what I like: \(ref.note)") }
-        parts.append("image: \(imageURL(for: ref).path)")
+        parts.append("\(ref.isVideo ? "video" : "image"): \(mediaURL(for: ref).path)")
         return parts.joined(separator: "\n")
     }
 

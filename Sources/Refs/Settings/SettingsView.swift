@@ -295,7 +295,7 @@ private struct AgentsTab: View {
                                ok: FileManager.default.isExecutableFile(atPath: helperPath))
                 } label: {
                     Text("MCP server")
-                    Text("Agents can list, search and view your references. Read-only.")
+                    Text("Agents can add, edit, search and view references, and move them to Trash or restore them.")
                 }
                 if !inApplications {
                     Text("Move Refs to the Applications folder before connecting agents. Their configs store the path below.")

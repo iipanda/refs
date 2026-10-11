@@ -11,7 +11,7 @@ FileHandle.standardError.write(Data("refs-mcp: serving \(library.path)\n".utf8))
 
 while let line = readLine(strippingNewline: true) {
     guard !line.trimmingCharacters(in: .whitespaces).isEmpty else { continue }
-    if let response = server.handle(Data(line.utf8)) {
+    if let response = await server.handle(Data(line.utf8)) {
         FileHandle.standardOutput.write(response)
         FileHandle.standardOutput.write(Data("\n".utf8))
     }

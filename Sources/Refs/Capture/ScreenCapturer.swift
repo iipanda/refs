@@ -2,11 +2,12 @@ import AppKit
 import ScreenCaptureKit
 
 enum CaptureError: LocalizedError {
-    case noDisplay, windowGone
+    case noDisplay, windowGone, noVideoFrames
 
     var errorDescription: String? {
         switch self {
         case .noDisplay: "The selected area isn't on any display."
+        case .noVideoFrames: "No video frames were recorded. Try recording for a little longer."
         case .windowGone: "That window closed before it could be captured."
         }
     }

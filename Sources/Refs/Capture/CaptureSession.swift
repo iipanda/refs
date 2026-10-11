@@ -4,6 +4,9 @@ import ScreenCaptureKit
 
 /// What a finished capture hands to the save panel.
 struct CaptureResult {
+    var videoURL: URL? = nil
+    var videoDuration: Double? = nil
+    var recordingWindowID: CGWindowID? = nil
     var image: CGImage
     var scale: CGFloat
     var app: SourceApp
@@ -51,6 +54,8 @@ final class CaptureSession {
     enum Mode { case area, window }
 
     private(set) var mode: Mode
+    let recording: Bool
+    private var recordingWindowID: CGWindowID?
     private let windows: [WindowInfo]
     private var overlays: [OverlayWindow] = []
     private let completion: (Result<CaptureResult, Error>?) -> Void
@@ -66,7 +71,8 @@ final class CaptureSession {
     private var tabs: [pid_t: [BrowserTab]] = [:]
     private var finished = false
 
-    init(mode: Mode, completion: @escaping (Result<CaptureResult, Error>?) -> Void) {
+    init(mode: Mode, recording: Bool = false, completion: @escaping (Result<CaptureResult, Error>?) -> Void) {
+        self.recording = recording
         self.mode = mode
         self.completion = completion
         windows = WindowList.snapshot()
@@ -225,6 +231,7 @@ final class CaptureSession {
     }
 
     private func finish(window: WindowInfo) {
+        recordingWindowID = window.id
         complete(frame: ScreenGeometry.cocoaRect(fromCG: window.bounds), source: window) { content in
             try await ScreenCapturer.captureWindow(id: window.id, content: content)
         }
@@ -259,7 +266,7 @@ final class CaptureSession {
                 }
                 let access = web == nil ? BrowserAccess.check(app: app) : nil
                 completion(.success(CaptureResult(
-                    image: image, scale: scale, app: app, windowTitle: source?.title, web: web,
+                    recordingWindowID: recordingWindowID, image: image, scale: scale, app: app, windowTitle: source?.title, web: web,
                     browserAccess: access, frame: frame,
                     sourceWindow: source, sourceWindowIsFrontmostOfApp: isFrontmost
                 )))

@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import Combine
 import RefsCore
 import SwiftUI
@@ -16,6 +17,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private var onboardingWindow: NSWindow?
     private let browserPermissions = BrowserPermissionsModel()
     private var session: CaptureSession?
+    private var recorder: VideoRecorder?
+    private var recordingCapture: CaptureResult?
+    private var recordingPanel: NSPanel?
+    private var stoppingRecording = false
+    private var startingRecording = false
     private var savePanel: SavePanelController?
     /// The app that was frontmost before a capture, so focus can go back to it afterwards.
     private var previousApp: NSRunningApplication?
@@ -40,6 +46,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             .sink { [weak self] _ in self?.registerHotKeys() }.store(in: &cancellables)
 
         #if DEBUG
+        if let dir = ProcessInfo.processInfo.environment["REFS_MANAGEMENT_CHECK"] {
+            showLibrary()
+            checkManagement(model: library, window: libraryWindow, directory: URL(fileURLWithPath: dir))
+            return
+        }
+        if let dir = ProcessInfo.processInfo.environment["REFS_RECORDING_CHECK"] {
+            checkRecording(to: URL(fileURLWithPath: dir))
+            return
+        }
         if let dir = ProcessInfo.processInfo.environment["REFS_SNAPSHOT_DIR"] {
             snapshotWindows(to: URL(fileURLWithPath: dir))
             return
@@ -64,6 +79,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         return false
     }
 
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if recorder != nil { stopRecordingAction(); return .terminateCancel }
+        if savePanel != nil, ProcessInfo.processInfo.environment["REFS_SNAPSHOT_DIR"] == nil { return .terminateCancel }
+        return .terminateNow
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
     // MARK: - Menu bar
@@ -85,6 +106,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
+        if recorder != nil {
+            menu.addItem(item(stoppingRecording ? "Finishing Recording…" : "Stop Recording", #selector(stopRecordingAction), nil))
+        } else {
+            menu.addItem(item("Record Area…", #selector(recordAreaAction), nil))
+            menu.addItem(item("Record Window…", #selector(recordWindowAction), nil))
+        }
+        menu.addItem(.separator())
         menu.addItem(item("Capture Area", #selector(captureAreaAction), preferences.captureArea))
         menu.addItem(item("Capture Window", #selector(captureWindowAction), preferences.captureWindow))
 
@@ -100,7 +128,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                                        action: #selector(openRecent(_:)), keyEquivalent: "")
                 entry.target = self
                 entry.representedObject = ref.id
-                if let thumb = Thumbnails.loadSync(library.imageURL(for: ref), maxPixelSize: 96) {
+                if let thumb = Thumbnails.loadSync(library.store.imageURL(for: ref), maxPixelSize: 96) {
                     entry.image = fitted(thumb, in: NSSize(width: 40, height: 26))
                 }
                 menu.addItem(entry)
@@ -137,6 +165,79 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             NSBezierPath(roundedRect: rect, xRadius: 3, yRadius: 3).addClip()
             image.draw(in: rect)
             return true
+        }
+    }
+
+    @objc private func recordAreaAction() { startCapture(.area, recording: true) }
+    @objc private func recordWindowAction() { startCapture(.window, recording: true) }
+    @objc private func stopRecordingAction() {
+        guard let recorder, !stoppingRecording, !startingRecording else { return }
+        stoppingRecording = true
+        recordingPanel?.contentView = NSHostingView(rootView: Text("Finishing recording…").padding(14))
+        Task { @MainActor in
+            do {
+                let url = try await recorder.stop()
+                guard var capture = recordingCapture else { throw CocoaError(.fileReadUnknown) }
+                let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+                generator.appliesPreferredTrackTransform = true
+                capture.image = try await generator.image(at: .zero).image
+                capture.videoDuration = try await AVURLAsset(url: url).load(.duration).seconds
+                capture.videoURL = url
+                clearRecording()
+                handle(.success(capture))
+            } catch {
+                recorder.discardFile()
+                clearRecording()
+                handle(.failure(error))
+            }
+        }
+    }
+
+    private func clearRecording() {
+        recordingPanel?.orderOut(nil)
+        recordingPanel = nil
+        recorder = nil
+        recordingCapture = nil
+        stoppingRecording = false
+        startingRecording = false
+        applyStatusItem()
+        statusItem?.button?.image = NSImage(systemSymbolName: "viewfinder", accessibilityDescription: "Refs")
+    }
+
+    private func beginRecording(_ capture: CaptureResult) {
+        let recorder = VideoRecorder()
+        self.recorder = recorder
+        startingRecording = true
+        recordingCapture = capture
+        recorder.onFailure = { [weak self] _ in self?.stopRecordingAction() }
+        Task { @MainActor in
+            do {
+                try await recorder.start(frame: capture.frame, windowID: capture.recordingWindowID)
+                startingRecording = false
+                // Always expose Stop, including when the normal menu-bar icon is hidden.
+                let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 240, height: 60),
+                    styleMask: [.titled, .nonactivatingPanel], backing: .buffered, defer: false)
+                panel.title = "Refs · Recording"
+                panel.level = .floating
+                panel.hidesOnDeactivate = false
+                panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+                panel.contentView = NSHostingView(rootView: HStack(spacing: 12) {
+                    Image(systemName: "record.circle.fill").foregroundStyle(.red)
+                    Text("Recording").fontWeight(.medium)
+                    Button("Stop") { [weak self] in self?.stopRecordingAction() }
+                }.padding(12))
+                if let screen = NSScreen.main {
+                    panel.setFrameOrigin(NSPoint(x: screen.visibleFrame.maxX - 256, y: screen.visibleFrame.maxY - 100))
+                }
+                recordingPanel = panel
+                panel.orderFrontRegardless()
+                statusItem?.button?.image = NSImage(systemSymbolName: "stop.circle.fill", accessibilityDescription: "Stop recording")
+            } catch {
+                _ = try? await recorder.stop()
+                recorder.discardFile()
+                clearRecording()
+                handle(.failure(error))
+            }
         }
     }
 
@@ -182,6 +283,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         appMenu.addItem(withTitle: "Quit Refs", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
         let fileMenu = NSMenu(title: "File")
+        fileMenu.addItem(item("Record Area…", #selector(recordAreaAction), nil))
+        fileMenu.addItem(item("Record Window…", #selector(recordWindowAction), nil))
+        fileMenu.addItem(item("Stop Recording", #selector(stopRecordingAction), nil))
+        fileMenu.addItem(.separator())
         fileMenu.addItem(item("Capture Area", #selector(captureAreaAction), preferences.captureArea))
         fileMenu.addItem(item("Capture Window", #selector(captureWindowAction), preferences.captureWindow))
         fileMenu.addItem(.separator())
@@ -255,7 +360,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     // MARK: - Capture
 
-    private func startCapture(_ mode: CaptureSession.Mode) {
+    private func startCapture(_ mode: CaptureSession.Mode, recording: Bool = false) {
+        if recorder != nil { stopRecordingAction(); return }
         if let session {
             // A second press while selecting switches mode, like pressing Space.
             if session.mode != mode { session.toggleMode() }
@@ -269,9 +375,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
         previousApp = NSWorkspace.shared.frontmostApplication
         if previousApp?.bundleIdentifier == Bundle.main.bundleIdentifier { previousApp = nil }
-        let session = CaptureSession(mode: mode) { [weak self] result in
+        let session = CaptureSession(mode: mode, recording: recording) { [weak self] result in
             self?.session = nil
-            self?.handle(result)
+            if recording, case .success(let capture) = result { self?.beginRecording(capture) }
+            else { self?.handle(result) }
         }
         self.session = session
         session.start()
@@ -291,9 +398,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                 if let draft {
                     do {
                         _ = try library.add(draft)
+                        if let url = capture.videoURL { try? FileManager.default.removeItem(at: url) }
                     } catch {
-                        showError("Couldn't save the reference", error.localizedDescription)
+                        showError("Couldn't save the reference", error.localizedDescription + (capture.videoURL.map { "\nThe recording is retained at \($0.path)." } ?? ""))
                     }
+                } else if let url = capture.videoURL {
+                    try? FileManager.default.removeItem(at: url)
                 }
                 restoreFocus()
             }
@@ -473,8 +583,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         showSettings()
         showOnboarding()
         if let ref = library.refs.first,
-           let image = ImageCoding.thumbnail(at: library.imageURL(for: ref), maxPixelSize: 4096) {
+           let image = ImageCoding.thumbnail(at: library.store.imageURL(for: ref), maxPixelSize: 4096) {
             let capture = CaptureResult(
+                videoURL: ref.isVideo ? library.store.mediaURL(for: ref) : nil, videoDuration: ref.duration,
                 image: image, scale: 2, app: ref.app, windowTitle: ref.windowTitle, web: ref.web,
                 browserAccess: BrowserSupport.browser(bundleID: "com.google.Chrome").map { .needsPermission($0) },
                 frame: NSRect(x: 100, y: 200, width: 600, height: 300), sourceWindow: nil,
@@ -528,8 +639,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             write(libraryWindow, "library.png")
             write(settingsWindow, "settings.png")
             write(onboardingWindow, "onboarding.png")
-            write(NSApp.windows.first { $0 is NSPanel && $0.isVisible }, "save-panel.png")
-            NSApp.terminate(nil)
+            let saveWindow = NSApp.windows.first { $0 is NSPanel && $0.isVisible }
+            write(saveWindow, "save-panel.png")
+            Task { @MainActor in
+                // AVPlayerView is composited by the window server, so bitmap caching cannot show it.
+                if let saveWindow, let content = try? await ScreenCapturer.shareableContent(),
+                   let (image, _) = try? await ScreenCapturer.captureWindow(id: CGWindowID(saveWindow.windowNumber), content: content) {
+                    try? ImageCoding.pngData(from: image)?.write(to: dir.appendingPathComponent("save-panel-native.png"))
+                }
+                NSApp.terminate(nil)
+            }
         }
     }
     #endif

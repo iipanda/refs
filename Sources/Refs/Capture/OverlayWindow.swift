@@ -134,7 +134,7 @@ final class OverlayView: NSView {
     private func drawHUD() {
         let source = session.sourceDescription
         let modeText = session.mode == .area ? "Area" : "Window"
-        let hint = "\(modeText)  ·  space to switch  ·  esc"
+        let hint = "\(session.recording ? "Record" : "Capture") \(modeText)  ·  space to switch  ·  esc"
 
         let truncating = NSMutableParagraphStyle()
         truncating.lineBreakMode = .byTruncatingTail

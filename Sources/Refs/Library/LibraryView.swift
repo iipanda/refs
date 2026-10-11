@@ -1,9 +1,10 @@
 import AppKit
 import RefsCore
 import SwiftUI
+import AVKit
 
 enum SidebarItem: Hashable {
-    case all, recent
+    case all, recent, trash
     case app(String)
     case site(String)
 }
@@ -39,20 +40,23 @@ struct LibraryView: View {
                 }
         }
         .frame(minWidth: 700, minHeight: 520)
+        .alert("Library error", isPresented: Binding(get: { model.libraryError != nil }, set: { if !$0 { model.libraryError = nil } })) {
+            Button("OK") { model.libraryError = nil }
+        } message: { Text(model.libraryError ?? "") }
         .onChange(of: visibleRefs.map(\.id), initial: true) { _, ids in
             model.visibleIDs = ids
             // Switching sections or searching drops selected cards that are no longer shown.
             model.selection.retain(ids)
         }
         .confirmationDialog(deletionTitle, isPresented: deletionPresented) {
-            Button("Delete", role: .destructive) {
+            Button("Move to Trash", role: .destructive) {
                 model.delete(ids: Set(model.pendingDeletion.map(\.id)))
                 model.pendingDeletion = []
             }
         } message: {
             Text(model.pendingDeletion.count == 1
-                 ? "The screenshot and its note are removed from the library."
-                 : "The screenshots and their notes are removed from the library.")
+                 ? "The capture and its note can be restored from Trash."
+                 : "The captures and their notes can be restored from Trash.")
         }
     }
 
@@ -72,7 +76,7 @@ struct LibraryView: View {
 
     private var deletionTitle: String {
         let count = model.pendingDeletion.count
-        return count == 1 ? "Delete this reference?" : "Delete \(count) references?"
+        return count == 1 ? "Move this reference to Trash?" : "Move \(count) references to Trash?"
     }
 
     /// Click selects one card (or clears it if it was the only one), ⌘-click toggles, ⇧-click selects a
@@ -109,6 +113,7 @@ struct LibraryView: View {
             Label("Recent", systemImage: "clock")
                 .badge(recentRefs.count)
                 .tag(SidebarItem.recent)
+            Label("Trash", systemImage: "trash").badge(model.trashRefs.count).tag(SidebarItem.trash)
             if !summary.apps.isEmpty {
                 Section("Apps") {
                     ForEach(summary.apps, id: \.name) { entry in
@@ -142,6 +147,7 @@ struct LibraryView: View {
         switch sidebar ?? .all {
         case .all: refs = model.refs
         case .recent: refs = recentRefs
+        case .trash: refs = model.trashRefs
         case .app(let key): refs = model.refs.filter { $0.web == nil && ($0.app.bundleID ?? $0.app.name) == key }
         case .site(let host): refs = model.refs.filter { $0.web?.host == host }
         }
@@ -151,7 +157,7 @@ struct LibraryView: View {
     private var grid: some View {
         let refs = visibleRefs
         return Group {
-            if model.refs.isEmpty {
+            if model.refs.isEmpty && sidebar != .trash {
                 emptyLibrary
             } else if refs.isEmpty {
                 Text("No matches")
@@ -170,6 +176,7 @@ struct LibraryView: View {
         switch sidebar ?? .all {
         case .all: "All References"
         case .recent: "Recent"
+        case .trash: "Trash"
         case .app(let key): model.refs.first { ($0.app.bundleID ?? $0.app.name) == key }?.app.name ?? key
         case .site(let host): host
         }
@@ -201,13 +208,17 @@ struct LibraryView: View {
         let targets = model.selection.contains(ref.id) && model.selection.count > 1 ? model.selectedRefs : [ref]
         let suffix = targets.count > 1 ? " \(targets.count) References" : " Reference"
         Button(targets.count > 1 ? "Open \(targets.count) Images" : "Open") {
-            targets.forEach { NSWorkspace.shared.open(model.imageURL(for: $0)) }
+            targets.forEach { NSWorkspace.shared.open(model.mediaURL(for: $0)) }
         }
         Button("Copy" + suffix) { copy(model.referenceText(for: targets)) }
-        Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting(targets.map(model.imageURL(for:))) }
+        Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting(targets.map(model.mediaURL(for:))) }
         Divider()
-        Button("Delete" + (targets.count > 1 ? " \(targets.count) References…" : "…"), role: .destructive) {
-            model.requestDeletion(of: targets)
+        if ref.isTrashed {
+            Button("Restore" + suffix) { model.restore(ids: Set(targets.map(\.id))) }
+        } else {
+            Button("Move to Trash" + (targets.count > 1 ? "…" : ""), role: .destructive) {
+                model.requestDeletion(of: targets)
+            }
         }
     }
 }
@@ -253,7 +264,7 @@ struct ReferenceGrid: View {
                                          count: layout.columns),
                           alignment: .leading, spacing: 18) {
                     ForEach(refs) { ref in
-                        ReferenceCard(ref: ref, imageURL: model.imageURL(for: ref),
+                        ReferenceCard(ref: ref, imageURL: model.store.imageURL(for: ref),
                                       selected: model.selection.contains(ref.id),
                                       favicon: { model.favicons[$0] })
                             .frame(width: layout.cardWidth)
@@ -265,7 +276,7 @@ struct ReferenceGrid: View {
                             }
                             .onTapGesture(count: 2) {
                                 model.selection.select(ref.id)
-                                NSWorkspace.shared.open(model.imageURL(for: ref))
+                                NSWorkspace.shared.open(model.mediaURL(for: ref))
                             }
                             .simultaneousGesture(TapGesture().onEnded {
                                 focused = true
@@ -310,7 +321,7 @@ struct ReferenceGrid: View {
         .focusEffectDisabled()
         .focused($focused)
         .onKeyPress(keys: [.delete, .deleteForward]) { _ in
-            guard !model.selection.isEmpty else { return .ignored }
+            guard !model.selection.isEmpty, !model.selectedRefs.allSatisfy(\.isTrashed) else { return .ignored }
             model.requestDeletion(of: model.selectedRefs)
             return .handled
         }
@@ -460,6 +471,7 @@ struct ReferenceCard: View {
             )
 
             HStack(spacing: 5) {
+                if ref.isVideo { Image(systemName: "play.rectangle.fill").help("Video") }
                 if let host = ref.web?.host {
                     SiteIcon(image: favicon(host), size: 14)
                 } else {
@@ -486,12 +498,18 @@ struct InspectorView: View {
     @ObservedObject var model: LibraryModel
     let ref: Reference
     @State private var note: String
+    @State private var savedNote: String
+    @State private var noteRevision: Int
+    @State private var saveError: String?
     @State private var image: NSImage?
 
     init(model: LibraryModel, ref: Reference) {
         self.model = model
         self.ref = ref
-        _note = State(initialValue: ref.note)
+        _note = State(initialValue: model.noteDrafts[ref.id]?.note ?? ref.note)
+        _savedNote = State(initialValue: ref.note)
+        _noteRevision = State(initialValue: model.noteDrafts[ref.id]?.revision ?? ref.revision)
+        _saveError = State(initialValue: model.noteDrafts[ref.id] == nil ? nil : "Unsaved draft.")
     }
 
     var body: some View {
@@ -499,13 +517,15 @@ struct InspectorView: View {
             VStack(alignment: .leading, spacing: 14) {
                 ZStack {
                     Rectangle().fill(.quaternary.opacity(0.6))
-                    if let image {
+                    if ref.isVideo {
+                        MoviePreview(url: model.mediaURL(for: ref))
+                    } else if let image {
                         Image(nsImage: image).resizable().aspectRatio(contentMode: .fit)
                     }
                 }
                 .frame(maxWidth: .infinity, minHeight: 160, maxHeight: 240)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
-                .onTapGesture(count: 2) { NSWorkspace.shared.open(model.imageURL(for: ref)) }
+                .onTapGesture(count: 2) { NSWorkspace.shared.open(model.mediaURL(for: ref)) }
                 .help("Double-click to open")
 
                 Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 6) {
@@ -528,7 +548,7 @@ struct InspectorView: View {
                             .help(web.url)
                         }
                     }
-                    row("Captured") {
+                    row(ref.provenance == nil ? "Captured" : "Added") {
                         Text(verbatim: "\(ref.createdAt.formatted(date: .abbreviated, time: .shortened)) · \(ref.pixelWidth) × \(ref.pixelHeight) px")
                     }
                 }
@@ -542,24 +562,58 @@ struct InspectorView: View {
                         .lineLimit(3...8)
                         .textFieldStyle(.roundedBorder)
                         .onChange(of: note) { _, value in
-                            model.updateNote(id: ref.id, note: value.trimmingCharacters(in: .whitespacesAndNewlines))
+                            if value != savedNote { saveNote(expectedRevision: noteRevision) }
                         }
                 }
 
+                if let saveError {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(saveError + " Your draft is kept.").font(.caption).foregroundStyle(.secondary)
+                        HStack {
+                            Button("Use Latest") {
+                                model.noteDrafts[ref.id] = nil
+                                savedNote = ref.note; noteRevision = ref.revision; note = ref.note; self.saveError = nil
+                            }
+                            Button("Save Draft") { saveNote(expectedRevision: ref.revision) }
+                        }.controlSize(.small)
+                    }
+                }
                 HStack {
                     Button("Copy Reference") { copy(model.referenceText(for: ref)) }
                         .help("Copy the id, source, note and file path, for pasting into an agent prompt")
-                    Button("Reveal") { NSWorkspace.shared.activateFileViewerSelecting([model.imageURL(for: ref)]) }
+                    Button("Reveal") { NSWorkspace.shared.activateFileViewerSelecting([model.mediaURL(for: ref)]) }
                     Spacer(minLength: 8)
-                    Button("Delete", role: .destructive) { model.requestDeletion(of: [ref]) }
+                    if ref.isTrashed {
+                        Button("Restore") { model.restore(ids: [ref.id]) }
+                    } else {
+                        Button("Move to Trash", role: .destructive) { model.requestDeletion(of: [ref]) }
+                    }
                 }
                 .controlSize(.small)
             }
             .padding(16)
         }
         .task(id: ref.id) {
-            image = await Thumbnails.load(model.imageURL(for: ref), maxPixelSize: 1200)
+            image = await Thumbnails.load(model.store.imageURL(for: ref), maxPixelSize: 1200)
         }
+        .onDisappear {
+            if note != savedNote { model.noteDrafts[ref.id] = .init(note: note, revision: noteRevision) }
+        }
+        .onChange(of: ref.revision) { _, _ in
+            if note == savedNote {
+                savedNote = ref.note; noteRevision = ref.revision; note = ref.note
+            } else if noteRevision != ref.revision {
+                saveError = "This reference changed elsewhere."
+            }
+        }
+    }
+
+    private func saveNote(expectedRevision: Int) {
+        do {
+            let updated = try model.updateNote(id: ref.id, note: note, expectedRevision: expectedRevision)
+            savedNote = updated.note; noteRevision = updated.revision; saveError = nil
+            model.noteDrafts[ref.id] = nil
+        } catch { saveError = error.localizedDescription }
     }
 
     private func row<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
@@ -579,7 +633,7 @@ struct BulkInspectorView: View {
         VStack(alignment: .leading, spacing: 16) {
             ZStack {
                 ForEach(Array(refs.prefix(3).enumerated().reversed()), id: \.element.id) { index, ref in
-                    StackedThumbnail(url: model.imageURL(for: ref))
+                    StackedThumbnail(url: model.store.imageURL(for: ref))
                         .rotationEffect(.degrees(Double(index) * -4))
                         .offset(x: CGFloat(index) * -10, y: CGFloat(index) * -6)
                 }
@@ -600,7 +654,7 @@ struct BulkInspectorView: View {
                 Button("Copy \(refs.count) References") { copy(model.referenceText(for: refs)) }
                     .help("Copy ids, sources, notes and file paths, for pasting into an agent prompt")
                 Button("Reveal in Finder") {
-                    NSWorkspace.shared.activateFileViewerSelecting(refs.map(model.imageURL(for:)))
+                    NSWorkspace.shared.activateFileViewerSelecting(refs.map(model.mediaURL(for:)))
                 }
                 Button("Deselect All") { model.selection.clear() }
             }
@@ -608,8 +662,11 @@ struct BulkInspectorView: View {
 
             Spacer()
 
-            Button("Delete \(refs.count) References…", role: .destructive) { model.requestDeletion(of: refs) }
-                .controlSize(.small)
+            if refs.allSatisfy(\.isTrashed) {
+                Button("Restore \(refs.count) References") { model.restore(ids: Set(refs.map(\.id))) }.controlSize(.small)
+            } else {
+                Button("Move \(refs.count) References to Trash…", role: .destructive) { model.requestDeletion(of: refs) }.controlSize(.small)
+            }
         }
         .padding(16)
     }
