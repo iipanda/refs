@@ -17,6 +17,12 @@ open build/Refs.app
 The script signs with your first Apple Development or Developer ID identity. Keep the same identity
 between builds: macOS ties Screen Recording and browser Automation permissions to it.
 
+The app icon uses the selected Quote direction. `Resources/AppIcon.png` is the dark icon master;
+`scripts/build-icon.sh` packages its standard macOS sizes into `build/Refs.icns`, which the app build
+includes before signing. The editable dark sources are `Resources/AppIcon.svg` and
+`Resources/AppIcon.vectorcraft`; the light sources are `Resources/AppIcon-light.svg` and
+`Resources/AppIcon-light.vectorcraft`. The PNG master keeps regular app builds independent of VectorCraft.
+
 ## Use
 
 - **⌘⇧2** captures an area, **⌘⇧3** a window. Space switches between the two while selecting, and Esc cancels.

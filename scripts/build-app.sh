@@ -11,6 +11,8 @@ cd "$(dirname "$0")/.."
 ROOT=$PWD
 APP="$ROOT/build/Refs.app"
 
+./scripts/build-icon.sh
+
 swift build -c release --arch arm64 --product Refs
 swift build -c release --arch arm64 --product refs-mcp
 BIN=$(swift build -c release --arch arm64 --show-bin-path)
@@ -18,6 +20,7 @@ BIN=$(swift build -c release --arch arm64 --show-bin-path)
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+cp build/Refs.icns "$APP/Contents/Resources/Refs.icns"
 cp "$BIN/Refs" "$APP/Contents/MacOS/Refs"
 cp "$BIN/refs-mcp" "$APP/Contents/MacOS/refs-mcp"
 strip -x "$APP/Contents/MacOS/Refs" "$APP/Contents/MacOS/refs-mcp"

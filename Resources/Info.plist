@@ -12,6 +12,8 @@
 	<string>com.karolchudzik.refs</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<key>CFBundleIconFile</key>
+	<string>Refs.icns</string>
 	<key>CFBundleName</key>
 	<string>Refs</string>
 	<key>CFBundlePackageType</key>

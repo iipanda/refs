@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1254" height="1254" viewBox="0 0 1254 1254">
+  <defs>
+    <filter id="filter-1" filterUnits="userSpaceOnUse" x="19.5" y="19.5" width="1213" height="1205" data-vc-blend="multiply" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="21.5"/><feOffset dx="0" dy="21" result="shadow"/><feFlood flood-color="#74550e" flood-opacity="0.22"/><feComposite in2="shadow" operator="in" result="paint"/><feMerge><feMergeNode in="paint"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <clipPath id="clip-path-1">
+      <path d="M390 107 L858 107 C967 107 1028 109 1071 160 C1124 212 1145 278 1145 415 L1145 831 C1145 934 1139 1014 1092 1067 C1037 1129 961 1137 855 1137 L400 1137 C287 1137 216 1128 165 1063 C116 1004 107 936 107 831 L107 416 C107 309 119 242 175 184 C233 123 299 107 390 107 Z"/>
+    </clipPath>
+    <filter id="filter-2" filterUnits="userSpaceOnUse" x="105" y="105" width="1042" height="1034" data-vc-blend="multiply" color-interpolation-filters="sRGB"><feComponentTransfer in="SourceAlpha"><feFuncA type="table" tableValues="1 0"/></feComponentTransfer><feGaussianBlur stdDeviation="22.5" result="glow"/><feFlood flood-color="#ae7100" flood-opacity="0.19"/><feComposite in2="glow" operator="in"/><feComposite in2="SourceAlpha" operator="in" result="paint"/><feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="paint"/></feMerge></filter>
+    <linearGradient id="linear-gradient-1" x1="327" y1="122" x2="837" y2="1139" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffe851"/>
+      <stop offset="0.55" stop-color="#ffd124"/>
+      <stop offset="1" stop-color="#f4b400"/>
+    </linearGradient>
+    <filter id="filter-3" filterUnits="userSpaceOnUse" x="108.5" y="94.5" width="1048" height="305" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="8.5"/></filter>
+    <linearGradient id="linear-gradient-2" x1="620" y1="111" x2="620" y2="361" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff6ad" stop-opacity="0.85"/>
+      <stop offset="0.6" stop-color="#fff6ad" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#fff6ad" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="filter-4" filterUnits="userSpaceOnUse" x="91.5" y="329.5" width="235" height="799" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="7.5"/></filter>
+    <linearGradient id="linear-gradient-3" x1="111" y1="618" x2="184" y2="618" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff6ad" stop-opacity="0"/>
+      <stop offset="0.55" stop-color="#fff6ad" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#fff6ad" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="filter-5" filterUnits="userSpaceOnUse" x="91.7541" y="799.5" width="1068.1488" height="365" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="8.5"/></filter>
+    <linearGradient id="linear-gradient-4" x1="620" y1="887" x2="620" y2="1142" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ae7100" stop-opacity="0"/>
+      <stop offset="0.67" stop-color="#ae7100" stop-opacity="0.19"/>
+      <stop offset="0.9" stop-color="#ae7100" stop-opacity="0.33"/>
+      <stop offset="1" stop-color="#ae7100" stop-opacity="0.08"/>
+    </linearGradient>
+    <filter id="filter-6" filterUnits="userSpaceOnUse" x="191.5" y="313.5" width="473" height="632" data-vc-blend="multiply" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="2.5"/><feOffset dx="0" dy="3" result="shadow"/><feFlood flood-color="#74550e" flood-opacity="0.25"/><feComposite in2="shadow" operator="in" result="paint"/><feMerge><feMergeNode in="paint"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="filter-7" filterUnits="userSpaceOnUse" x="191.5" y="313.5" width="473" height="632" data-vc-blend="multiply" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="12"/><feOffset dx="3" dy="20" result="shadow"/><feFlood flood-color="#74550e" flood-opacity="0.32"/><feComposite in2="shadow" operator="in" result="paint"/><feMerge><feMergeNode in="paint"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="filter-8" filterUnits="userSpaceOnUse" x="256.275" y="383.275" width="343.45" height="497.45" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="0.575"/></filter>
+    <linearGradient id="linear-gradient-5" x1="324" y1="402" x2="503" y2="877" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2d3033"/>
+      <stop offset="1" stop-color="#0e100f"/>
+    </linearGradient>
+    <clipPath id="clip-path-2">
+      <path d="M361 382 L493 382 C560 382 596 411 596 482 L596 615 C596 654 589 679 570 711 L478 851 C469 865 455 872 428 872 L355 872 C331 872 319 854 331 832 L409 706 C414 699 416 693 416 689 C397 694 378 697 356 697 C292 697 260 676 260 618 L260 481 C260 416 288 382 361 382 Z"/>
+    </clipPath>
+    <filter id="filter-9" filterUnits="userSpaceOnUse" x="258" y="380" width="340" height="494" data-vc-blend="multiply" color-interpolation-filters="sRGB"><feComponentTransfer in="SourceAlpha"><feFuncA type="table" tableValues="1 0"/></feComponentTransfer><feGaussianBlur stdDeviation="13" result="glow"/><feFlood flood-color="#060708" flood-opacity="0.27"/><feComposite in2="glow" operator="in"/><feComposite in2="SourceAlpha" operator="in" result="paint"/><feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="paint"/></feMerge></filter>
+    <linearGradient id="linear-gradient-6" x1="286" y1="398" x2="575" y2="864" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#55595d"/>
+      <stop offset="0.51" stop-color="#2d3033"/>
+      <stop offset="1" stop-color="#171819"/>
+    </linearGradient>
+    <filter id="filter-10" filterUnits="userSpaceOnUse" x="240" y="359" width="378" height="353" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="12"/></filter>
+    <linearGradient id="linear-gradient-7" x1="345" y1="394" x2="405" y2="675" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d0d3d5" stop-opacity="0.67"/>
+      <stop offset="0.46" stop-color="#d0d3d5" stop-opacity="0.315"/>
+      <stop offset="1" stop-color="#d0d3d5" stop-opacity="0.04"/>
+    </linearGradient>
+    <filter id="filter-11" filterUnits="userSpaceOnUse" x="283.75" y="397.75" width="294.5" height="68.5" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="1.75"/></filter>
+    <linearGradient id="linear-gradient-8" x1="345" y1="401" x2="405" y2="478" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d0d3d5" stop-opacity="0.48"/>
+      <stop offset="0.55" stop-color="#d0d3d5" stop-opacity="0.27"/>
+      <stop offset="1" stop-color="#d0d3d5" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="filter-12" filterUnits="userSpaceOnUse" x="329.7434" y="679.5" width="104.7325" height="181" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="2.5"/></filter>
+    <linearGradient id="linear-gradient-9" x1="418" y1="692" x2="345" y2="851" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d0d3d5" stop-opacity="0.14"/>
+      <stop offset="0.5" stop-color="#d0d3d5" stop-opacity="0.49"/>
+      <stop offset="1" stop-color="#d0d3d5" stop-opacity="0.04"/>
+    </linearGradient>
+    <filter id="filter-13" filterUnits="userSpaceOnUse" x="589.5" y="313.5" width="473" height="632" data-vc-blend="multiply" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="2.5"/><feOffset dx="0" dy="3" result="shadow"/><feFlood flood-color="#74550e" flood-opacity="0.25"/><feComposite in2="shadow" operator="in" result="paint"/><feMerge><feMergeNode in="paint"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="filter-14" filterUnits="userSpaceOnUse" x="589.5" y="313.5" width="473" height="632" data-vc-blend="multiply" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="12"/><feOffset dx="3" dy="20" result="shadow"/><feFlood flood-color="#74550e" flood-opacity="0.32"/><feComposite in2="shadow" operator="in" result="paint"/><feMerge><feMergeNode in="paint"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="filter-15" filterUnits="userSpaceOnUse" x="654.275" y="383.275" width="343.45" height="497.45" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="0.575"/></filter>
+    <linearGradient id="linear-gradient-10" x1="722" y1="402" x2="901" y2="877" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2d3033"/>
+      <stop offset="1" stop-color="#0e100f"/>
+    </linearGradient>
+    <clipPath id="clip-path-3">
+      <path d="M759 382 L891 382 C958 382 994 411 994 482 L994 615 C994 654 987 679 968 711 L876 851 C867 865 853 872 826 872 L753 872 C729 872 717 854 729 832 L807 706 C812 699 814 693 814 689 C795 694 776 697 754 697 C690 697 658 676 658 618 L658 481 C658 416 686 382 759 382 Z"/>
+    </clipPath>
+    <filter id="filter-16" filterUnits="userSpaceOnUse" x="656" y="380" width="340" height="494" data-vc-blend="multiply" color-interpolation-filters="sRGB"><feComponentTransfer in="SourceAlpha"><feFuncA type="table" tableValues="1 0"/></feComponentTransfer><feGaussianBlur stdDeviation="13" result="glow"/><feFlood flood-color="#060708" flood-opacity="0.27"/><feComposite in2="glow" operator="in"/><feComposite in2="SourceAlpha" operator="in" result="paint"/><feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="paint"/></feMerge></filter>
+    <linearGradient id="linear-gradient-11" x1="684" y1="398" x2="973" y2="864" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#55595d"/>
+      <stop offset="0.51" stop-color="#2d3033"/>
+      <stop offset="1" stop-color="#171819"/>
+    </linearGradient>
+    <filter id="filter-17" filterUnits="userSpaceOnUse" x="638" y="359" width="378" height="353" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="12"/></filter>
+    <linearGradient id="linear-gradient-12" x1="743" y1="394" x2="803" y2="675" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d0d3d5" stop-opacity="0.67"/>
+      <stop offset="0.46" stop-color="#d0d3d5" stop-opacity="0.315"/>
+      <stop offset="1" stop-color="#d0d3d5" stop-opacity="0.04"/>
+    </linearGradient>
+    <filter id="filter-18" filterUnits="userSpaceOnUse" x="681.75" y="397.75" width="294.5" height="68.5" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="1.75"/></filter>
+    <linearGradient id="linear-gradient-13" x1="743" y1="401" x2="803" y2="478" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d0d3d5" stop-opacity="0.48"/>
+      <stop offset="0.55" stop-color="#d0d3d5" stop-opacity="0.27"/>
+      <stop offset="1" stop-color="#d0d3d5" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="filter-19" filterUnits="userSpaceOnUse" x="727.7434" y="679.5" width="104.7325" height="181" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="2.5"/></filter>
+    <linearGradient id="linear-gradient-14" x1="816" y1="692" x2="743" y2="851" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d0d3d5" stop-opacity="0.14"/>
+      <stop offset="0.5" stop-color="#d0d3d5" stop-opacity="0.49"/>
+      <stop offset="1" stop-color="#d0d3d5" stop-opacity="0.04"/>
+    </linearGradient>
+  </defs>
+  <title>Refs · Quote · original-layered</title>
+  <g id="_01___Rounded_tile___original-layered" data-name="01 · Rounded tile · original-layered">
+    <g filter="url(#filter-1)">
+      <g id="Tile___sculpted_face_and_bevel" data-name="Tile · sculpted face and bevel" clip-path="url(#clip-path-1)">
+        <g filter="url(#filter-2)">
+          <path id="Tile___continuous_colored_face" data-name="Tile · continuous colored face" d="M390 107 L858 107 C967 107 1028 109 1071 160 C1124 212 1145 278 1145 415 L1145 831 C1145 934 1139 1014 1092 1067 C1037 1129 961 1137 855 1137 L400 1137 C287 1137 216 1128 165 1063 C116 1004 107 936 107 831 L107 416 C107 309 119 242 175 184 C233 123 299 107 390 107 Z" fill="url(#linear-gradient-1)"/>
+        </g>
+        <g filter="url(#filter-3)">
+          <path id="Tile___broad_soft_upper_bevel_highlight" data-name="Tile · broad soft upper bevel highlight" d="M390 122 L857 122 C966 122 1024 124 1067 172 C1109 220 1126 281 1129 372 C1115 283 1095 235 1054 198 C1010 161 953 149 856 149 L391 149 C300 149 239 172 198 216 C164 253 144 303 136 362 C139 283 158 238 195 199 C244 147 302 122 390 122 Z" fill="url(#linear-gradient-2)"/>
+        </g>
+        <g filter="url(#filter-4)">
+          <path id="Tile___rounded_left-edge_light" data-name="Tile · rounded left-edge light" d="M139 354 C126 416 128 571 129 829 C129 932 143 992 187 1043 C213 1071 250 1091 302 1104 C239 1101 196 1076 169 1038 C134 989 116 927 116 830 L116 414 C116 391 126 369 139 354 Z" fill="url(#linear-gradient-3)"/>
+        </g>
+        <g filter="url(#filter-5)">
+          <path id="Tile___soft_lower-bevel_occlusion" data-name="Tile · soft lower-bevel occlusion" d="M123 827 C134 958 146 1010 194 1060 C241 1107 310 1118 402 1118 L850 1118 C956 1118 1018 1104 1066 1057 C1105 1018 1121 951 1127 827 C1140 952 1130 1021 1092 1067 C1037 1129 961 1137 855 1137 L400 1137 C287 1137 216 1128 165 1063 C125 1015 112 939 123 827 Z" fill="url(#linear-gradient-4)"/>
+        </g>
+      </g>
+    </g>
+  </g>
+  <g id="_02___Closing_quote_1___raised_surface" data-name="02 · Closing quote 1 · raised surface">
+    <g filter="url(#filter-6)">
+      <g filter="url(#filter-7)">
+        <g id="Closing_quote_1___sculpted_mark" data-name="Closing quote 1 · sculpted mark">
+          <g filter="url(#filter-8)">
+            <path id="Quote___rounded_lower_thickness" data-name="Quote · rounded lower thickness" d="M361 387 L493 387 C560 387 596 416 596 487 L596 620 C596 659 589 684 570 716 L478 856 C469 870 455 877 428 877 L355 877 C331 877 319 859 331 837 L409 711 C414 704 416 698 416 694 C397 699 378 702 356 702 C292 702 260 681 260 623 L260 486 C260 421 288 387 361 387 Z" fill="url(#linear-gradient-5)"/>
+          </g>
+          <g id="Quote___clipped_face_and_bevel_lighting" data-name="Quote · clipped face and bevel lighting" clip-path="url(#clip-path-2)">
+            <g filter="url(#filter-9)">
+              <path id="Quote___illuminated_sculptural_face" data-name="Quote · illuminated sculptural face" d="M361 382 L493 382 C560 382 596 411 596 482 L596 615 C596 654 589 679 570 711 L478 851 C469 865 455 872 428 872 L355 872 C331 872 319 854 331 832 L409 706 C414 699 416 693 416 689 C397 694 378 697 356 697 C292 697 260 676 260 618 L260 481 C260 416 288 382 361 382 Z" fill="url(#linear-gradient-6)"/>
+            </g>
+            <g filter="url(#filter-10)">
+              <path id="Quote___broad_diffuse_upper_and_left_bevel_light" data-name="Quote · broad diffuse upper and left bevel light" d="M361 397 L492 397 C550 397 574 420 580 466 L566 465 C558 431 534 421 491 421 L365 421 C324 421 302 440 295 471 L295 576 C293 626 305 655 333 674 C300 668 278 645 278 607 L278 480 C278 426 301 397 361 397 Z" fill="url(#linear-gradient-7)"/>
+            </g>
+            <g filter="url(#filter-11)">
+              <path id="Quote___narrow_upper_specular_glint" data-name="Quote · narrow upper specular glint" d="M361 405 L492 405 C543 405 564 421 571 452 L566 454 C555 427 534 415 491 415 L365 415 C328 415 305 431 297 458 L291 459 C299 424 321 405 361 405 Z" fill="url(#linear-gradient-8)"/>
+            </g>
+            <g filter="url(#filter-12)">
+              <path id="Quote___diagonal_tail-edge_glint" data-name="Quote · diagonal tail-edge glint" d="M421 689 C430 698 422 713 414 726 L352 829 C347 837 347 844 352 851 C340 849 336 836 342 825 L407 712 C416 698 418 692 421 689 Z" fill="url(#linear-gradient-9)"/>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+  <g id="_03___Closing_quote_2___raised_surface" data-name="03 · Closing quote 2 · raised surface">
+    <g filter="url(#filter-13)">
+      <g filter="url(#filter-14)">
+        <g id="Closing_quote_2___sculpted_mark" data-name="Closing quote 2 · sculpted mark">
+          <g filter="url(#filter-15)">
+            <path id="Quote___rounded_lower_thickness-2" data-name="Quote · rounded lower thickness" d="M759 387 L891 387 C958 387 994 416 994 487 L994 620 C994 659 987 684 968 716 L876 856 C867 870 853 877 826 877 L753 877 C729 877 717 859 729 837 L807 711 C812 704 814 698 814 694 C795 699 776 702 754 702 C690 702 658 681 658 623 L658 486 C658 421 686 387 759 387 Z" fill="url(#linear-gradient-10)"/>
+          </g>
+          <g id="Quote___clipped_face_and_bevel_lighting-2" data-name="Quote · clipped face and bevel lighting" clip-path="url(#clip-path-3)">
+            <g filter="url(#filter-16)">
+              <path id="Quote___illuminated_sculptural_face-2" data-name="Quote · illuminated sculptural face" d="M759 382 L891 382 C958 382 994 411 994 482 L994 615 C994 654 987 679 968 711 L876 851 C867 865 853 872 826 872 L753 872 C729 872 717 854 729 832 L807 706 C812 699 814 693 814 689 C795 694 776 697 754 697 C690 697 658 676 658 618 L658 481 C658 416 686 382 759 382 Z" fill="url(#linear-gradient-11)"/>
+            </g>
+            <g filter="url(#filter-17)">
+              <path id="Quote___broad_diffuse_upper_and_left_bevel_light-2" data-name="Quote · broad diffuse upper and left bevel light" d="M759 397 L890 397 C948 397 972 420 978 466 L964 465 C956 431 932 421 889 421 L763 421 C722 421 700 440 693 471 L693 576 C691 626 703 655 731 674 C698 668 676 645 676 607 L676 480 C676 426 699 397 759 397 Z" fill="url(#linear-gradient-12)"/>
+            </g>
+            <g filter="url(#filter-18)">
+              <path id="Quote___narrow_upper_specular_glint-2" data-name="Quote · narrow upper specular glint" d="M759 405 L890 405 C941 405 962 421 969 452 L964 454 C953 427 932 415 889 415 L763 415 C726 415 703 431 695 458 L689 459 C697 424 719 405 759 405 Z" fill="url(#linear-gradient-13)"/>
+            </g>
+            <g filter="url(#filter-19)">
+              <path id="Quote___diagonal_tail-edge_glint-2" data-name="Quote · diagonal tail-edge glint" d="M819 689 C828 698 820 713 812 726 L750 829 C745 837 745 844 750 851 C738 849 734 836 740 825 L805 712 C814 698 816 692 819 689 Z" fill="url(#linear-gradient-14)"/>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>
