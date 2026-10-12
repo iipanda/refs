@@ -6,7 +6,7 @@ library over MCP.
 
 ## Build
 
-Requires macOS 14+, Xcode 16+ (Swift 6 toolchain) on Apple Silicon.
+Requires macOS 14+, Xcode 26+ (Swift 6 toolchain and Icon Composer asset compiler) on Apple Silicon.
 
 ```sh
 swift test                 # core and MCP tests
@@ -17,11 +17,14 @@ open build/Refs.app
 The script signs with your first Apple Development or Developer ID identity. Keep the same identity
 between builds: macOS ties Screen Recording and browser Automation permissions to it.
 
-The app icon uses the selected Quote direction. `Resources/AppIcon.png` is the dark icon master;
-`scripts/build-icon.sh` packages its standard macOS sizes into `build/Refs.icns`, which the app build
-includes before signing. The editable dark sources are `Resources/AppIcon.svg` and
-`Resources/AppIcon.vectorcraft`; the light sources are `Resources/AppIcon-light.svg` and
-`Resources/AppIcon-light.vectorcraft`. The PNG master keeps regular app builds independent of VectorCraft.
+The app icon uses the selected hand-shaded Quote direction. Editable light and dark masters
+are `Resources/AppIcon-light.svg`, `Resources/AppIcon.svg` and their `.vectorcraft` counterparts.
+The dark tile uses a neutral gray gradient matched to the Icon Composer rendition.
+`Resources/Refs.icon` packages PNG renders of that approved artwork for Default and Dark,
+plus separate opaque white vector quotes for Clear/Mono. The authored depth is retained;
+Composer supplies appearance switching and the Clear container rather than repainting the faces.
+`scripts/build-icon.sh` compiles `Refs.icns` and `Assets.car`, which are included before signing.
+Regular app builds do not require VectorCraft.
 
 ## Use
 

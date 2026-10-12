@@ -1,19 +1,23 @@
 #!/bin/zsh
-# Packages the selected icon master into the standard macOS size representations.
+# Compile the approved Quote artwork with native Default and Dark appearances.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-REFS_ICON_MASTER="$PWD/Resources/AppIcon.png"
-REFS_ICON_SET="$PWD/build/Refs.iconset"
-mkdir -p "$REFS_ICON_SET"
+mkdir -p build
+REFS_ICON_OUTPUT=$(mktemp -d "$PWD/build/refs-icon.XXXXXX")
+trap 'rm -rf "$REFS_ICON_OUTPUT"' EXIT
+xcrun actool Resources/Refs.icon \
+  --compile "$REFS_ICON_OUTPUT" \
+  --platform macosx \
+  --minimum-deployment-target 14.0 \
+  --app-icon Refs \
+  --output-partial-info-plist "$REFS_ICON_OUTPUT/icon-info.plist" \
+  --output-format human-readable-text
 
-for REFS_ICON_SIZE in 16 32 128 256 512; do
-  sips -z "$REFS_ICON_SIZE" "$REFS_ICON_SIZE" "$REFS_ICON_MASTER" \
-    --out "$REFS_ICON_SET/icon_${REFS_ICON_SIZE}x${REFS_ICON_SIZE}.png" >/dev/null
-  REFS_ICON_RETINA_SIZE=$((REFS_ICON_SIZE * 2))
-  sips -z "$REFS_ICON_RETINA_SIZE" "$REFS_ICON_RETINA_SIZE" "$REFS_ICON_MASTER" \
-    --out "$REFS_ICON_SET/icon_${REFS_ICON_SIZE}x${REFS_ICON_SIZE}@2x.png" >/dev/null
-done
-
-iconutil --convert icns "$REFS_ICON_SET" --output "$PWD/build/Refs.icns"
-echo "Built build/Refs.icns"
+# actool can report an export warning while returning success. Require both outputs.
+[[ -s "$REFS_ICON_OUTPUT/Refs.icns" && -s "$REFS_ICON_OUTPUT/Assets.car" ]] || {
+  echo "Icon compilation did not produce Refs.icns and Assets.car" >&2
+  exit 1
+}
+cp "$REFS_ICON_OUTPUT/Refs.icns" "$REFS_ICON_OUTPUT/Assets.car" "$REFS_ICON_OUTPUT/icon-info.plist" build/
+echo "Built build/Refs.icns and build/Assets.car"

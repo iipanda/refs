@@ -1,0 +1,150 @@
+{
+  "groups": [
+    {
+      "layers": [
+        {
+          "name": "Hand-shaded Default",
+          "image-name": "Quote-light.png",
+          "glass": false,
+          "hidden-specializations": [
+            {
+              "value": false
+            },
+            {
+              "appearance": "dark",
+              "value": true
+            },
+            {
+              "appearance": "tinted",
+              "value": true
+            }
+          ],
+          "opacity": 1,
+          "position": {
+            "scale": 1.22,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "name": "Hand-shaded Dark",
+          "image-name": "Quote-dark.png",
+          "glass": false,
+          "hidden-specializations": [
+            {
+              "value": true
+            },
+            {
+              "appearance": "dark",
+              "value": false
+            },
+            {
+              "appearance": "tinted",
+              "value": true
+            }
+          ],
+          "opacity": 1,
+          "position": {
+            "scale": 1.22,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0
+      },
+      "specular": false,
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      },
+      "name": "Approved VectorCraft artwork"
+    },
+    {
+      "name": "Opaque Clear quotes",
+      "layers": [
+        {
+          "name": "Clear quote 1",
+          "image-name": "Quote-1.svg",
+          "fill": {
+            "solid": "srgb:1.00000,1.00000,1.00000,1.00000"
+          },
+          "glass": false,
+          "opacity": 1,
+          "position": {
+            "scale": 1.22,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          },
+          "hidden-specializations": [
+            {
+              "value": true
+            },
+            {
+              "appearance": "tinted",
+              "value": false
+            }
+          ]
+        },
+        {
+          "name": "Clear quote 2",
+          "image-name": "Quote-2.svg",
+          "fill": {
+            "solid": "srgb:1.00000,1.00000,1.00000,1.00000"
+          },
+          "glass": false,
+          "opacity": 1,
+          "position": {
+            "scale": 1.22,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          },
+          "hidden-specializations": [
+            {
+              "value": true
+            },
+            {
+              "appearance": "tinted",
+              "value": false
+            }
+          ]
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0
+      },
+      "specular": false,
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  },
+  "fill-specializations": [
+    {
+      "value": "none"
+    },
+    {
+      "appearance": "dark",
+      "value": "none"
+    },
+    {
+      "appearance": "tinted",
+      "value": "system-light"
+    }
+  ]
+}
