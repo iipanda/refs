@@ -44,8 +44,9 @@ Permissions (a setup window walks through both on first launch):
 ## Agents (MCP)
 
 `Refs.app/Contents/MacOS/refs-mcp` is a stdio MCP server that reads and manages the library folder directly,
-so it works even when the app isn't running. Settings › Agents shows the exact setup for Claude Code,
-Codex, Cursor and Claude Desktop, for example:
+so it works even when the app isn't running. Settings › Agents opens with a copyable prompt that asks
+your coding agent to configure Refs and verify the connection. Collapsible manual instructions cover Claude Code, Codex, Cursor,
+Claude Desktop, Pi Agent and OMP (Oh My Pi). For example:
 
 ```sh
 claude mcp add --scope user refs -- /Applications/Refs.app/Contents/MacOS/refs-mcp

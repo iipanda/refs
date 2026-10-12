@@ -99,7 +99,7 @@ components:
 
 This is an extraction of the implemented marketing surface in `landing/`, created for code-led local static preview. Warm yellow, charcoal and the user-confirmed quotation icon carry the identity. Generous space, large conversational headings, cropped source material and offset notes make the reference and the reason for keeping it visible together.
 
-The North Star, descriptive color names, typography pairing and page composition document this implementation for review; they are not claimed as a user-approved permanent style. The native Swift UI is not redesigned by this specification. Audience and CTA defaults remain assumptions in `PRODUCT.md`. Page strategy and the selection record belong in `landing/DIRECTION.md`.
+The North Star, descriptive color names, typography pairing and page composition document this implementation for review; they are not claimed as a user-approved permanent style. The native Swift UI is not redesigned by this specification. Audience remains a working assumption in `PRODUCT.md`; the user requested a download CTA after approving the landing page. Page strategy and the selection record belong in `landing/DIRECTION.md`.
 
 **Key Characteristics:**
 
@@ -157,7 +157,7 @@ The centered shell has a maximum width of 1264px. Desktop gutters are 56px per s
 
 The hero is a two-column grid (`.95fr 1.1fr`, 45px gap) with 64px/102px vertical padding and a 660px minimum height. The workflow splits source and explanation (`1.1fr 1fr`) with a 402px panel minimum height. Library uses `1fr 1.1fr`; agent handoff uses equal columns; FAQ uses `.9fr 1.1fr`. Section separation is broad and editorial: workflow 99px/110px, library 87px/97px and agents 107px vertical padding.
 
-At 1100px, hero spacing contracts and illustration sizes reduce. At 760px, hero, workflow panel, library, agents and FAQ become single-column; header navigation is hidden while the identity and Meet Refs action remain. Demo tabs stay in a horizontal row; reset becomes an icon with an accessible name. Captions stack, footer wraps, hero artwork caps at 520px, library collection at 450px and handoff at 480px. Mobile workflow illustration and explanation retain minimum heights of 324px and 330px. The only large-screen override begins at 1550px, expanding hero spacing and the source photo.
+At 1100px, hero spacing contracts and illustration sizes reduce. At 760px, hero, workflow panel, library, agents and FAQ become single-column; header navigation is hidden while the identity and Download for Mac action remain. Demo tabs stay in a horizontal row; reset becomes an icon with an accessible name. Captions stack, footer wraps, hero artwork caps at 520px, library collection at 450px and handoff at 480px. Mobile workflow illustration and explanation retain minimum heights of 324px and 330px. The only large-screen override begins at 1550px, expanding hero spacing and the source photo.
 
 ## Elevation & Depth
 
@@ -191,7 +191,7 @@ The note textarea is the implemented field: 14px/1.7 Manrope, 1px `#69705e` bord
 
 ### Navigation
 
-The header combines quotation icon and Bricolage wordmark with 13px secondary links and an underlined Meet Refs action. Links turn yellow on hover. Header navigation disappears at the mobile breakpoint; the call to action stays. A focusable skip link appears at the upper left on focus.
+The header combines quotation icon and Bricolage wordmark with 13px secondary links and an underlined Download for Mac action. Links turn yellow on hover. Header navigation disappears at the mobile breakpoint; the call to action stays. A focusable skip link appears at the upper left on focus.
 
 ### Workflow Tabs and State
 
@@ -221,3 +221,5 @@ Buttons, links, fields, summaries and focusable panels share a 3px yellow outlin
 - **Don't** promote this review implementation into an approved permanent style or production launch.
 - **Don't** apply this landing-page visual extraction as a redesign of the native Swift UI.
 - **Don't** substitute font glyphs for the implemented SVG action icons.
+
+The primary header, hero and closing actions download the packaged Mac development build at `downloads/Refs-macOS.zip`. The hero pairs its yellow download button with a secondary inline demo link in a wrapping flex row (21px gap; 16px on mobile). The platform line identifies macOS 14+, Apple Silicon and development-build status.

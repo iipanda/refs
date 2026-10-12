@@ -287,6 +287,37 @@ private struct AgentsTab: View {
         Bundle.main.bundleURL.path.hasPrefix("/Applications/")
     }
 
+    private var setupPrompt: String {
+        """
+        Connect this coding agent to my local Refs library via MCP.
+        Server: refs
+        Executable: \(helperPath)
+        Transport: stdio, no arguments.
+
+        Identify this client and its installed version. Add Refs to its user-level MCP configuration, preserving other servers and settings. For Pi Agent or OMP, use built-in MCP support when available; check the installed version first.
+
+        Verify with get_library_info and list_references (limit: 1). Do not add, edit or remove references during setup. Report success only after the calls work, or explain any required restart or reload.
+        """
+    }
+
+    private func configurationJSON(includeTransport: Bool = false) -> String {
+        var server: [String: Any] = ["command": helperPath]
+        if includeTransport { server["type"] = "stdio" }
+        let configuration: [String: Any] = ["mcpServers": ["refs": server]]
+        guard let data = try? JSONSerialization.data(withJSONObject: configuration,
+                                                    options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]),
+              let text = String(data: data, encoding: .utf8) else { return "" }
+        return text
+    }
+
+    private var quotedPath: String {
+        // JSON and TOML basic strings share these escapes; leave slashes literal.
+        guard let data = try? JSONSerialization.data(withJSONObject: helperPath,
+                                                    options: [.fragmentsAllowed, .withoutEscapingSlashes]),
+              let text = String(data: data, encoding: .utf8) else { return "\"\"" }
+        return text
+    }
+
     var body: some View {
         Form {
             Section {
@@ -295,7 +326,7 @@ private struct AgentsTab: View {
                                ok: FileManager.default.isExecutableFile(atPath: helperPath))
                 } label: {
                     Text("MCP server")
-                    Text("Agents can add, edit, search and view references, and move them to Trash or restore them.")
+                    Text("Give your coding agent access to images, sources and notes in your local library.")
                 }
                 if !inApplications {
                     Text("Move Refs to the Applications folder before connecting agents. Their configs store the path below.")
@@ -304,41 +335,74 @@ private struct AgentsTab: View {
                 }
             }
 
-            Section("Claude Code") {
-                CommandBlock(text: "claude mcp add --scope user refs -- \(shellQuoted(helperPath))")
+            Section("Connect with a prompt") {
+                Text("Copy this into your coding agent. It will configure Refs and check the connection.")
+                    .foregroundStyle(.secondary)
+                CommandBlock(text: setupPrompt, copyLabel: "Copy prompt", font: .callout)
             }
-            Section("Codex · ~/.codex/config.toml") {
-                CommandBlock(text: "[mcp_servers.refs]\ncommand = \"\(helperPath)\"")
-            }
-            Section("Cursor · Claude Desktop") {
-                CommandBlock(text: """
-                    {
-                      "mcpServers": {
-                        "refs": { "command": "\(helperPath)" }
-                      }
-                    }
-                    """)
+
+            Section("Manual setup") {
+                Text("Merge the Refs entry into your existing configuration, then restart or reload the agent.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                DisclosureGroup("Claude Code") {
+                    CommandBlock(text: "claude mcp add --scope user refs -- \(shellQuoted(helperPath))")
+                }
+                DisclosureGroup("Codex") {
+                    Text("~/.codex/config.toml").font(.caption).foregroundStyle(.secondary)
+                    CommandBlock(text: "[mcp_servers.refs]\ncommand = \(quotedPath)")
+                }
+                DisclosureGroup("Cursor") {
+                    Text("~/.cursor/mcp.json").font(.caption).foregroundStyle(.secondary)
+                    CommandBlock(text: configurationJSON(includeTransport: true))
+                }
+                DisclosureGroup("Claude Desktop") {
+                    Text("~/Library/Application Support/Claude/claude_desktop_config.json")
+                        .font(.caption).foregroundStyle(.secondary)
+                    CommandBlock(text: configurationJSON())
+                }
+                DisclosureGroup("Pi Agent") {
+                    Text("For Pi with built-in MCP. Run this in your terminal, then /reload in an open Pi session.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    CommandBlock(text: "pi mcp add refs -- \(shellQuoted(helperPath))\npi mcp list")
+                    Text("Pi stores user servers in ~/.pi/agent/mcp.json. If pi mcp is unavailable, update Pi or use your installed MCP extension's setup flow.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Link("Pi MCP documentation", destination: URL(string: "https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/mcp.md")!)
+                        .font(.caption)
+                }
+                DisclosureGroup("OMP · Oh My Pi") {
+                    Text("~/.omp/agent/mcp.json, or your active profile's agent/mcp.json")
+                        .font(.caption).foregroundStyle(.secondary)
+                    CommandBlock(text: configurationJSON(includeTransport: true))
+                    Text("In OMP, run /mcp reload, then /mcp test refs to check the connection.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Link("OMP MCP documentation", destination: URL(string: "https://github.com/can1357/oh-my-pi/blob/main/docs/mcp-config.md")!)
+                        .font(.caption)
+                }
             }
         }
         .formStyle(.grouped)
+        .frame(height: 560)
     }
 
     private func shellQuoted(_ path: String) -> String {
-        path.contains(" ") ? "\"\(path)\"" : path
+        "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 }
 
 private struct CommandBlock: View {
     let text: String
+    var copyLabel = "Copy"
+    var font: Font = .system(.caption, design: .monospaced)
     @State private var copied = false
 
     var body: some View {
         HStack(alignment: .top) {
             Text(text)
-                .font(.system(.caption, design: .monospaced))
+                .font(font)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Button(copied ? "Copied" : "Copy") {
+            Button(copied ? "Copied" : copyLabel) {
                 copy(text)
                 copied = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copied = false }

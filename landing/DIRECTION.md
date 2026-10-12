@@ -2,7 +2,7 @@
 
 Mode: Persuade. Local preview; no publication, data collection or invented release claims.
 
-Audience assumption: designers and developers collecting UI inspiration for their next build. CTA assumption: try the interactive workflow. User-pinned identity: quotation icon, yellow and charcoal.
+Audience assumption: designers and developers collecting UI inspiration for their next build. CTA: download the current Mac development build, as requested by the user; the interactive workflow is a secondary action. User-pinned identity: quotation icon, yellow and charcoal.
 
 The seven grounded structures considered were an annotated design publication, a reference contact sheet, a studio specimen wall, a saved-browser archive, a designer's editing table, a typographic sourcebook, and a compact capture tool demonstration. The selected editing table brings the source and its saved interpretation together in the first viewport.
 
@@ -14,7 +14,7 @@ Signature interaction: visitor selects the sample UI, writes a short note, saves
 
 Challenger verdicts: fluid ink, nixie lab, animation cel, patent sheet, brick instruction book and shadow bazaar were declined because their literal systems weaken identification with a UI-reference tool and obscure its mechanism. The editing table adopts their relevant disciplines: continuous state transitions (fluid ink), precise active-state feedback (counter), visible cause and effect (cel), unambiguous source attribution (patent), legible sequential controls (instruction book), and preservation of an object's context (bazaar). Their materials are not borrowed.
 
-Quality bar: recognizable product mechanism at first glance; complete keyboard-operable walkthrough; warm yellow against neutral charcoal; no fake metrics, testimonials, waitlist or public download; readable at 390 px; self-hosted assets and reduced-motion support.
+Quality bar: recognizable product mechanism at first glance; complete keyboard-operable walkthrough; warm yellow against neutral charcoal; no fake metrics, testimonials or waitlist; clearly labeled development download; readable at 390 px; self-hosted assets and reduced-motion support.
 
 ## Execution contract
 
