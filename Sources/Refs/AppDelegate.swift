@@ -439,15 +439,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                                   backing: .buffered, defer: false)
             window.title = "Refs"
             window.isReleasedWhenClosed = false
-            window.setFrameAutosaveName("RefsLibrary")
             window.identifier = ReferenceGrid.windowIdentifier
-            window.contentViewController = NSHostingController(rootView: LibraryView(
+            let hosting = NSHostingController(rootView: LibraryView(
                 model: library, preferences: preferences, openSettings: { [weak self] in self?.showSettings() }))
+            // Keep the layout's minimum size, while letting the user's saved window size win.
+            hosting.sizingOptions = .minSize
+            window.contentViewController = hosting
             window.delegate = self
             if !window.setFrameUsingName("RefsLibrary") {
                 window.setContentSize(NSSize(width: 1120, height: 700))
                 window.center()
             }
+            // Restore after attaching the content, before setup changes can be autosaved.
+            window.setFrameAutosaveName("RefsLibrary")
             libraryWindow = window
         }
         libraryOpen = true
