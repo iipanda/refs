@@ -27,11 +27,12 @@ final class SaveDraft: ObservableObject {
 
     /// Asks for Automation permission (macOS shows its prompt), then reads the tab URL.
     func allowBrowserAccess() {
-        guard case .needsPermission(let browser) = browserAccess, let window = capture.sourceWindow else { return }
+        guard !askingPermission, case .needsPermission(let browser) = browserAccess,
+              let window = capture.sourceWindow else { return }
         askingPermission = true
         let isFrontmost = capture.sourceWindowIsFrontmostOfApp
-        Task.detached(priority: .userInitiated) {
-            let permission = BrowserSupport.permission(for: browser.bundleID, ask: true)
+        Task { @MainActor in
+            let permission = await BrowserSupport.permission(for: browser.bundleID, ask: true)
             let tabs = permission == .granted ? await BrowserSupport.tabs(for: browser) : []
             let tab = BrowserSupport.tab(for: window, among: tabs, isFrontmostOfApp: isFrontmost)
             await MainActor.run {

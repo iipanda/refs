@@ -19,6 +19,22 @@ struct CaptureResult {
     /// The source window, so the URL can be read after permission is granted.
     var sourceWindow: WindowInfo?
     var sourceWindowIsFrontmostOfApp: Bool
+
+    /// Optional browser metadata must not prevent a completed image from reaching the save panel.
+    /// This is shared by capture completion and synthetic tests; the task uses bounded lookups.
+    func resolvingBrowserMetadata(
+        tabs tabTask: Task<[BrowserTab], Never>?,
+        accessLookup: (SourceApp) async -> BrowserAccess? = BrowserAccess.check
+    ) async -> CaptureResult {
+        let tabs = await tabTask?.value ?? []
+        var result = self
+        if let sourceWindow,
+           let tab = BrowserSupport.tab(for: sourceWindow, among: tabs, isFrontmostOfApp: sourceWindowIsFrontmostOfApp) {
+            result.web = WebSource(url: tab.url, title: tab.title)
+        }
+        result.browserAccess = result.web == nil ? await accessLookup(app) : nil
+        return result
+    }
 }
 
 /// Why a browser capture has no URL.
@@ -30,9 +46,9 @@ enum BrowserAccess: Equatable {
     /// The browser doesn't expose its tabs (Firefox, Zen).
     case unsupported(String)
 
-    static func check(app: SourceApp) -> BrowserAccess? {
+    static func check(app: SourceApp) async -> BrowserAccess? {
         if let browser = BrowserSupport.browser(bundleID: app.bundleID) {
-            switch BrowserSupport.permission(for: browser.bundleID, ask: false) {
+            switch await BrowserSupport.permission(for: browser.bundleID, ask: false) {
             case .notDetermined: return .needsPermission(browser)
             case .denied: return .denied(browser)
             default: return nil
@@ -141,6 +157,8 @@ final class CaptureSession {
     func cancel() {
         guard !finished else { return }
         finished = true
+        contentTask.cancel()
+        tabTasks.values.forEach { $0.cancel() }
         tearDown()
         completion(nil)
     }
@@ -209,8 +227,8 @@ final class CaptureSession {
         for window in windows where seen.insert(window.pid).inserted {
             guard let browser = BrowserSupport.browser(bundleID: window.bundleID) else { continue }
             let pid = window.pid
-            let task = Task.detached(priority: .userInitiated) { () -> [BrowserTab] in
-                guard BrowserSupport.permission(for: browser.bundleID, ask: false) == .granted else { return [] }
+            let task = Task { () -> [BrowserTab] in
+                guard await BrowserSupport.permission(for: browser.bundleID, ask: false) == .granted else { return [] }
                 return await BrowserSupport.tabs(for: browser)
             }
             tabTasks[pid] = task
@@ -257,19 +275,13 @@ final class CaptureSession {
                 if content == nil { content = try await ScreenCapturer.shareableContent() }
                 guard let content else { throw CaptureError.noDisplay }
                 let (image, scale) = try await capture(content)
-                let tabs = await tabTask?.value ?? []
-
                 let app = SourceApp(name: source?.appName ?? "Unknown", bundleID: source?.bundleID)
-                var web: WebSource?
-                if let source, let tab = BrowserSupport.tab(for: source, among: tabs, isFrontmostOfApp: isFrontmost) {
-                    web = WebSource(url: tab.url, title: tab.title)
-                }
-                let access = web == nil ? BrowserAccess.check(app: app) : nil
-                completion(.success(CaptureResult(
-                    recordingWindowID: recordingWindowID, image: image, scale: scale, app: app, windowTitle: source?.title, web: web,
-                    browserAccess: access, frame: frame,
+                let captured = CaptureResult(
+                    recordingWindowID: recordingWindowID, image: image, scale: scale, app: app, windowTitle: source?.title, web: nil,
+                    browserAccess: nil, frame: frame,
                     sourceWindow: source, sourceWindowIsFrontmostOfApp: isFrontmost
-                )))
+                )
+                completion(.success(await captured.resolvingBrowserMetadata(tabs: tabTask)))
             } catch {
                 completion(.failure(error))
             }

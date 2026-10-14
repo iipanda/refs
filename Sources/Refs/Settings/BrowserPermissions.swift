@@ -6,6 +6,7 @@ import SwiftUI
 /// macOS asks for Automation consent once per target app and only while that app is running, so
 /// "allow all" walks the browsers in turn: it starts any that aren't open in the background, shows
 /// the system prompt, and quits the ones it started.
+@MainActor
 final class BrowserPermissionsModel: ObservableObject {
     struct Row: Identifiable {
         var browser: BrowserSupport.Browser
@@ -19,12 +20,26 @@ final class BrowserPermissionsModel: ObservableObject {
     @Published private(set) var requesting: String?
     @Published private(set) var loaded = false
     private var observers: [NSObjectProtocol] = []
+    private let loadBrowsers: () -> (supported: [BrowserSupport.Browser], unsupported: [BrowserSupport.UnsupportedBrowser])
+    private let lookupPermission: (String) async -> BrowserSupport.Permission
+    private var refreshTask: Task<Void, Never>?
+    private var needsRefresh = false
 
-    init() {
+    init(
+        observeChanges: Bool = true,
+        loadBrowsers: @escaping () -> (supported: [BrowserSupport.Browser], unsupported: [BrowserSupport.UnsupportedBrowser]) = BrowserSupport.installedBrowsers,
+        lookupPermission: @escaping (String) async -> BrowserSupport.Permission = { await BrowserSupport.knownPermission(for: $0) }
+    ) {
+        self.loadBrowsers = loadBrowsers
+        self.lookupPermission = lookupPermission
+        guard observeChanges else { return }
         // Keep the list current without reopening it: a browser opening or quitting changes what
         // macOS can report, and answers can arrive from the save panel or System Settings.
         let workspace = NSWorkspace.shared.notificationCenter
-        let refresh: (Notification) -> Void = { [weak self] _ in self?.refreshIfIdle() }
+        let refresh: @Sendable (Notification) -> Void = { [weak self] _ in
+            // All observers below explicitly deliver on the main operation queue.
+            MainActor.assumeIsolated { self?.refreshIfIdle() }
+        }
         observers = [
             workspace.addObserver(forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main, using: refresh),
             workspace.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main, using: refresh),
@@ -50,23 +65,39 @@ final class BrowserPermissionsModel: ObservableObject {
         rows.filter { $0.permission == .notDetermined || $0.permission == .notRunning }
     }
 
-    var allDecided: Bool { loaded && pending.isEmpty }
+    var allDecided: Bool {
+        loaded && rows.allSatisfy { $0.permission == .granted || $0.permission == .denied }
+    }
 
     func refresh() {
-        Task.detached(priority: .userInitiated) {
-            let (supported, unsupported) = BrowserSupport.installedBrowsers()
-            let rows = supported.map { Row(browser: $0, permission: BrowserSupport.knownPermission(for: $0.bundleID)) }
-            await MainActor.run {
+        guard requesting == nil, refreshTask == nil else {
+            needsRefresh = true
+            return
+        }
+        needsRefresh = false
+        let loadBrowsers = self.loadBrowsers
+        refreshTask = Task { @MainActor in
+            let (supported, unsupported) = await Task.detached(priority: .userInitiated) { loadBrowsers() }.value
+            var rows: [Row] = []
+            for browser in supported {
+                guard !Task.isCancelled else { break }
+                rows.append(Row(browser: browser, permission: await self.lookupPermission(browser.bundleID)))
+            }
+            if !Task.isCancelled, self.requesting == nil {
                 self.rows = rows
                 self.unsupported = unsupported
                 self.loaded = true
             }
+            self.refreshTask = nil
+            if self.needsRefresh, self.requesting == nil { self.refresh() }
         }
     }
 
     func allowAll() {
         let browsers = pending.map(\.browser)
         guard requesting == nil, !browsers.isEmpty else { return }
+        requesting = browsers[0].bundleID
+        refreshTask?.cancel()
         Task { @MainActor in
             for browser in browsers {
                 await request(browser)
@@ -78,6 +109,8 @@ final class BrowserPermissionsModel: ObservableObject {
 
     func allow(_ browser: BrowserSupport.Browser) {
         guard requesting == nil else { return }
+        requesting = browser.bundleID
+        refreshTask?.cancel()
         Task { @MainActor in
             await request(browser)
             requesting = nil
@@ -93,15 +126,13 @@ final class BrowserPermissionsModel: ObservableObject {
             launched = await launchInBackground(browser)
             guard launched != nil else { return }
         }
-        let result = await Task.detached(priority: .userInitiated) { () -> BrowserSupport.Permission in
-            // The browser may need a moment after launch before it accepts Apple Events.
-            for _ in 0..<40 {
-                let status = BrowserSupport.permission(for: browser.bundleID, ask: true)
-                if status != .notRunning { return status }
-                try? await Task.sleep(for: .milliseconds(250))
-            }
-            return .notRunning
-        }.value
+        // The browser may need a moment after launch before it accepts Apple Events.
+        var result: BrowserSupport.Permission = .notRunning
+        for _ in 0..<40 {
+            result = await BrowserSupport.permission(for: browser.bundleID, ask: true)
+            if result != .notRunning { break }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
         if let index = rows.firstIndex(where: { $0.id == browser.bundleID }) {
             rows[index].permission = result
         }
@@ -165,7 +196,10 @@ struct BrowserPermissionsList: View {
                 Button("Allow…") { model.allow(row.browser) }
                     .disabled(model.requesting != nil)
             case .unknown:
-                StatusPill(text: "Unknown", ok: false)
+                HStack(spacing: 6) {
+                    StatusPill(text: "Unavailable", ok: false)
+                    Button("Retry") { model.refresh() }
+                }
             }
         }
     }

@@ -3,7 +3,7 @@ import Carbon.HIToolbox
 import RefsCore
 
 /// The active tab of one browser window, as reported over Apple Events.
-struct BrowserTab: Equatable {
+struct BrowserTab: Equatable, Sendable {
     var windowName: String?
     var url: String
     var title: String?
@@ -16,9 +16,9 @@ struct BrowserTab: Equatable {
 /// `current tab` works. Browsers without tab scripting, like Firefox and Zen, fall back to the
 /// window title.
 enum BrowserSupport {
-    enum Dialect { case safari, chromium }
+    enum Dialect: Sendable { case safari, chromium }
 
-    struct Browser: Identifiable, Hashable {
+    struct Browser: Identifiable, Hashable, Sendable {
         var bundleID: String
         var name: String
         var dialect: Dialect
@@ -140,16 +140,24 @@ enum BrowserSupport {
 
     // MARK: - Automation permission
 
-    enum Permission: Equatable {
+    enum Permission: Equatable, Sendable {
         case granted, denied, notDetermined, notRunning, unknown(OSStatus)
     }
 
-    /// Checks (and optionally asks for) permission to send Apple Events to a browser.
-    /// Asking blocks until the user answers, so call it off the main thread.
-    ///
-    /// macOS can only answer while the browser is running; otherwise this returns `.notRunning`.
-    /// Use `knownPermission(for:)` to show a status for closed browsers.
-    static func permission(for bundleID: String, ask: Bool) -> Permission {
+    private static let automation = BrowserAutomation(
+        permissionLookup: { determinePermission(for: $0, ask: $1) },
+        tabLookup: { runTabsScript($0) }
+    )
+
+    /// Suspends the caller while a bounded blocking worker queries macOS. Even passive checks can
+    /// hang; neither MainActor nor Swift's cooperative executor may execute the native API.
+    static func permission(for bundleID: String, ask: Bool) async -> Permission {
+        let permission = await automation.permission(for: bundleID, ask: ask)
+        await remember(permission, for: bundleID)
+        return permission
+    }
+
+    private static func determinePermission(for bundleID: String, ask: Bool) -> Permission {
         let target = NSAppleEventDescriptor(bundleIdentifier: bundleID)
         guard let desc = target.aeDesc else { return .unknown(-1) }
         let status = AEDeterminePermissionToAutomateTarget(desc, typeWildCard, typeWildCard, ask)
@@ -161,13 +169,12 @@ enum BrowserSupport {
         case procNotFound: permission = .notRunning
         default: permission = .unknown(status)
         }
-        remember(permission, for: bundleID)
         return permission
     }
 
     /// The live status when the browser is running, otherwise the last answer seen for it.
-    static func knownPermission(for bundleID: String) -> Permission {
-        let live = permission(for: bundleID, ask: false)
+    static func knownPermission(for bundleID: String) async -> Permission {
+        let live = await permission(for: bundleID, ask: false)
         guard live == .notRunning else { return live }
         switch UserDefaults.standard.dictionary(forKey: rememberedKey)?[bundleID] as? String {
         case "granted": return .granted
@@ -180,6 +187,7 @@ enum BrowserSupport {
     private static let rememberedKey = "browserPermissions"
 
     /// Keeps the last definite answer per browser, since macOS won't report it while the browser is closed.
+    @MainActor
     private static func remember(_ permission: Permission, for bundleID: String) {
         let value: String?
         switch permission {
@@ -200,16 +208,10 @@ enum BrowserSupport {
 
     // MARK: - Reading tabs
 
-    private static let queue = DispatchQueue(label: "refs.applescript")
-
     /// The active tab of every window of a running browser, front to back.
     /// Never call this without permission: it would show a consent prompt.
     static func tabs(for browser: Browser) async -> [BrowserTab] {
-        await withCheckedContinuation { continuation in
-            queue.async {
-                continuation.resume(returning: runTabsScript(browser))
-            }
-        }
+        await automation.tabs(for: browser)
     }
 
     private static func runTabsScript(_ browser: Browser) -> [BrowserTab] {

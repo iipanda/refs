@@ -4,6 +4,7 @@ import Combine
 import RefsCore
 import SwiftUI
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDelegate {
     private let preferences = Preferences.shared
     private let hotKeyStatus = HotKeyStatus()

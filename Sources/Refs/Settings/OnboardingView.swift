@@ -48,7 +48,12 @@ struct OnboardingView: View {
                         if browsers.allDecided {
                             StatusPill(text: "Done", ok: true)
                         } else {
-                            Button(browsers.requesting == nil ? "Allow All Browsers" : "Allowing…") { browsers.allowAll() }
+                            Button(browsers.requesting == nil
+                                   ? (browsers.pending.isEmpty ? "Retry Browsers" : "Allow All Browsers")
+                                   : "Allowing…") {
+                                if browsers.pending.isEmpty { browsers.refresh() }
+                                else { browsers.allowAll() }
+                            }
                                 .buttonStyle(.borderedProminent)
                                 .disabled(!browsers.loaded || browsers.requesting != nil)
                         }

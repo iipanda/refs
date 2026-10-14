@@ -23,6 +23,7 @@ let package = Package(
         ),
         .testTarget(name: "RefsCoreTests", dependencies: ["RefsCore"]),
         .testTarget(name: "RefsMCPTests", dependencies: ["RefsMCP"]),
+        .testTarget(name: "RefsAppTests", dependencies: ["Refs"]),
     ],
     swiftLanguageModes: [.v5]
 )
