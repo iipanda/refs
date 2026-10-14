@@ -1,0 +1,31 @@
+---
+import ArrowUp from '../assets/icons/arrow-up.svg';
+import ArrowUpRight from '../assets/icons/arrow-up-right.svg';
+import logo from '../assets/brand/refs-light.svg';
+import { githubUrl } from '../lib/links';
+---
+<footer class="shell">
+  <a href="#" class="footer-brand"><img src={logo.src} width="30" height="30" alt="" />refs</a>
+  <p>A little library for a good eye.</p>
+  <nav class="footer-links" aria-label="Footer">
+    <a href={githubUrl}>GitHub <ArrowUpRight width={14} height={14} aria-hidden="true" /></a>
+    <a href="#main">Back to the top <ArrowUp width={14} height={14} aria-hidden="true" /></a>
+  </nav>
+</footer>
+
+<style>
+  footer { display: flex; align-items: center; gap: 28px; padding-block: 24px 31px; border-top: 1px solid var(--line); color: var(--secondary); font-size: 12px; }
+  .footer-brand { display: inline-flex; align-items: center; gap: 7px; color: var(--paper); font: 700 26px/1 Bricolage, sans-serif; letter-spacing: -.025em; }
+  .footer-brand img { object-fit: contain; }
+  p { margin-right: auto; }
+  .footer-links { display: flex; align-items: center; gap: 32px; }
+  .footer-links a { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; transition: color .2s; }
+  .footer-links a:hover { color: var(--yellow); }
+  @media (max-width: 760px) {
+    footer { flex-wrap: wrap; gap: 6px 20px; padding-bottom: 26px; }
+    .footer-brand { font-size: 24px; }
+    .footer-brand img { width: 28px; height: 28px; }
+    .footer-links { margin-left: auto; gap: 22px; }
+    p { order: 3; flex-basis: 100%; margin: 6px 0 0; }
+  }
+</style>

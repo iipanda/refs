@@ -1,0 +1,42 @@
+---
+import LibraryWindow from './LibraryWindow.svelte';
+
+interface Props { thumbImage: string; }
+const { thumbImage } = Astro.props;
+const features = ['Screenshots and screen recordings', 'App and website sources, kept together', 'Color-coded tags for the threads you collect', 'Your notes, searchable when you need them', 'Files stored locally on your Mac'];
+---
+<section class="library-section" id="library" aria-labelledby="library-title">
+  <div class="shell library-layout">
+    <div class="library-copy">
+      <h2 id="library-title">An eye for detail.<br />A place for all of it.</h2>
+      <p>Interfaces, interactions, those little moments of clarity. Keep a library that feels like you.</p>
+      <ul>{features.map(feature => <li>{feature}</li>)}</ul>
+    </div>
+    <div class="library-window-wrap">
+      <LibraryWindow client:load image={thumbImage} />
+      <p class="library-caption">A sample library. Search it, or pick a source or tag.</p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .library-section { overflow: hidden; padding-block: 87px 97px; background: var(--yellow); color: var(--ink); }
+  .library-layout { display: grid; grid-template-columns: .8fr 1.3fr; align-items: center; gap: 56px; }
+  h2 { font-size: clamp(33px, 3.8vw, 51px); }
+  .library-copy > p { max-width: 380px; margin-top: 24px; font-size: 16px; line-height: 1.75; }
+  ul { margin: 30px 0 0; padding: 0; font-size: 14px; font-weight: 600; list-style: none; }
+  li { position: relative; padding: 7px 0 7px 22px; }
+  li::before { content: ''; position: absolute; left: 0; top: 11px; width: 13px; height: 13px; background: var(--ink); mask: url('../assets/icons/check.svg') center / contain no-repeat; }
+  .library-window-wrap { min-width: 0; }
+  .library-caption { margin-top: 16px; color: var(--muted-ink); font-size: 13px; font-weight: 600; }
+  @media (max-width: 1100px) {
+    .library-layout { gap: 35px; }
+  }
+  @media (max-width: 760px) {
+    .library-section { padding-block: 62px 65px; }
+    .library-layout { grid-template-columns: 1fr; gap: 45px; }
+    h2 { font-size: 36px; }
+    .library-copy > p { margin-top: 20px; font-size: 15px; }
+    ul { margin-top: 23px; }
+  }
+</style>

@@ -1,0 +1,72 @@
+---
+import Download from '../assets/icons/download.svg';
+import logo from '../assets/brand/refs-light.svg';
+import { downloadName, downloadUrl, githubUrl } from '../lib/links';
+
+const sections = [
+  { href: '#workflow', label: 'How it works' },
+  { href: '#library', label: 'Library' },
+  { href: '#agents', label: 'Agents' },
+  { href: '#setup', label: 'FAQ' },
+];
+---
+<header class="site-header">
+  <div class="header-inner shell">
+    <a class="wordmark" href="#" aria-label="Refs home"><img src={logo.src} width="43" height="43" alt="" /><span>refs</span></a>
+    <nav class="header-nav" aria-label="Main navigation">
+      {sections.map(section => <a href={section.href}>{section.label}</a>)}
+    </nav>
+    <div class="header-actions">
+      <a class="github-link" href={githubUrl}><span class="gh-mark" aria-hidden="true"></span><span class="github-label">GitHub</span></a>
+      <a class="nav-cta" href={downloadUrl} download={downloadName}>Download <Download width={16} height={16} aria-hidden="true" /></a>
+    </div>
+  </div>
+</header>
+
+<script>
+  const header = document.querySelector<HTMLElement>('.site-header')!;
+  const markScrolled = () => header.classList.toggle('is-scrolled', scrollY > 8);
+  addEventListener('scroll', markScrolled, { passive: true });
+  markScrolled();
+
+  // Highlight the section in the middle of the viewport; the hero clears it.
+  const links = [...header.querySelectorAll<HTMLAnchorElement>('.header-nav a')];
+  const observer = new IntersectionObserver(entries => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      for (const link of links) {
+        if (link.hash === `#${entry.target.id}`) link.setAttribute('aria-current', 'true');
+        else link.removeAttribute('aria-current');
+      }
+    }
+  }, { rootMargin: '-45% 0px -50% 0px' });
+  for (const section of [document.querySelector('.hero'), ...links.map(link => document.querySelector(link.hash))]) {
+    if (section) observer.observe(section);
+  }
+</script>
+
+<style>
+  .site-header { position: sticky; top: 0; z-index: 10; border-bottom: 1px solid transparent; background: #222423e0; -webkit-backdrop-filter: blur(14px) saturate(1.2); backdrop-filter: blur(14px) saturate(1.2); transition: border-color .3s; }
+  .site-header.is-scrolled { border-bottom-color: var(--line); }
+  .header-inner { display: flex; align-items: center; justify-content: space-between; gap: 30px; padding-block: 20px; }
+  .wordmark { display: inline-flex; align-items: center; gap: 8px; font: 700 31px/1 Bricolage, sans-serif; letter-spacing: -.025em; }
+  .wordmark img { object-fit: contain; }
+  .header-nav { display: flex; gap: 6px; color: var(--secondary); font-size: 13px; font-weight: 600; }
+  .header-nav a { padding: 8px 13px; border-radius: 999px; transition: color .2s, background .2s; }
+  .header-nav a:hover { background: #ffffff0f; color: var(--paper); }
+  .header-nav a[aria-current='true'] { color: var(--yellow); }
+  .header-actions { display: flex; align-items: center; gap: 10px; }
+  .github-link { display: inline-flex; align-items: center; gap: 9px; min-height: 40px; padding: 0 15px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; font-weight: 600; transition: border-color .2s, color .2s, background .2s; }
+  .github-link:hover { border-color: #8b8f7d; background: #ffffff0a; }
+  .nav-cta { display: inline-flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 15px; border-radius: 8px; background: var(--yellow); color: var(--ink); font-size: 13px; font-weight: 600; transition: background .2s; }
+  .nav-cta:hover { background: var(--yellow-hover); }
+  @media (max-width: 760px) {
+    .header-inner { padding-block: 14px; }
+    .header-nav { display: none; }
+    .github-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    .github-link { padding: 0 11px; }
+    .nav-cta { gap: 8px; padding: 0 13px; font-size: 12px; }
+    .wordmark { font-size: 28px; }
+    .wordmark img { width: 37px; height: 37px; }
+  }
+</style>

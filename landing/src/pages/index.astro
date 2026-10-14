@@ -1,0 +1,34 @@
+---
+import { getImage } from 'astro:assets';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import Hero from '../components/Hero.astro';
+import Intro from '../components/Intro.astro';
+import WorkflowSection from '../components/WorkflowSection.astro';
+import LibrarySection from '../components/LibrarySection.astro';
+import AgentsSection from '../components/AgentsSection.astro';
+import Faq from '../components/Faq.astro';
+import Closing from '../components/Closing.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import studio from '../assets/studio.jpg';
+
+// One sourced photo, sized for each place it appears.
+const [large, thumb, tiny] = await Promise.all([960, 480, 120].map(width => getImage({ src: studio, width, format: 'webp' })));
+const image = large.src, thumbImage = thumb.src, tinyImage = tiny.src;
+---
+<BaseLayout
+  title="Refs — Good ideas. Kept close."
+  description="Save the UI you love, remember why, and bring it into your next build. Refs is a local macOS reference library for designers and developers."
+>
+  <SiteHeader />
+  <main id="main">
+    <Hero {image} {thumbImage} {tinyImage} />
+    <Intro />
+    <WorkflowSection {image} {thumbImage} />
+    <LibrarySection {thumbImage} />
+    <AgentsSection image={thumbImage} />
+    <Faq />
+    <Closing />
+  </main>
+  <SiteFooter />
+</BaseLayout>

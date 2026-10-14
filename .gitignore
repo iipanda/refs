@@ -4,4 +4,7 @@ build/
 .swiftpm/
 .DS_Store
 .impeccable/hook.cache.json
-/landing/downloads/
+/landing/public/downloads/
+/landing/node_modules/
+/landing/dist/
+/landing/.astro/

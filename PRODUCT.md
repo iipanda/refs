@@ -20,4 +20,4 @@ The name is Refs. Use the approved quotation icon and its yellow/charcoal palett
 The first landing page speaks to designers and developers who collect UI inspiration and use coding agents. The user requested a download button; the primary CTA now downloads the current Mac development build, and the secondary CTA explores the browser-local demonstration. The audience remains a working assumption, not a confirmed permanent preference; the audience question was presented during the initial landing-page task. The download CTA is an explicit user requirement.
 
 ## Stack
-The repository is a Swift package with existing static HTML mocks. This preview is buildless HTML/CSS/JS in landing/, with self-hosted fonts and no framework runtime.
+The repository is a Swift package with existing static HTML mocks. The landing page in landing/ is an Astro site that builds to static HTML, with self-hosted fonts. Svelte islands run the interactive workflow demo and sample library; the other illustrations use small component scripts.

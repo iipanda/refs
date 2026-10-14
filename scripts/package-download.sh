@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ./scripts/build-app.sh
-REFS_DOWNLOAD_DIR="$PWD/landing/downloads"
+REFS_DOWNLOAD_DIR="$PWD/landing/public/downloads"
 REFS_DOWNLOAD_ARCHIVE="$REFS_DOWNLOAD_DIR/Refs-macOS.zip"
 mkdir -p "$REFS_DOWNLOAD_DIR"
 ditto -c -k --sequesterRsrc --keepParent "$PWD/build/Refs.app" "$REFS_DOWNLOAD_ARCHIVE"

@@ -1,0 +1,25 @@
+---
+import WorkflowDemo from './WorkflowDemo.svelte';
+
+interface Props { image: string; thumbImage: string; }
+const { image, thumbImage } = Astro.props;
+---
+<section id="workflow" class="workflow shell" aria-labelledby="workflow-title">
+  <div class="section-heading">
+    <h2 id="workflow-title">From “I like that”<br />to “let’s use that.”</h2>
+    <p>Capture a detail, give it a little context,<br />and make it useful again. Try it here.</p>
+  </div>
+  <WorkflowDemo client:visible {image} {thumbImage} />
+</section>
+
+<style>
+  .workflow { padding-block: 99px 110px; }
+  .section-heading { margin-bottom: 35px; }
+  h2 { font-size: clamp(35px, 4vw, 51px); }
+  .section-heading > p { margin-top: 20px; color: var(--secondary); font-size: 16px; line-height: 1.75; }
+  @media (max-width: 760px) {
+    .workflow { padding-block: 63px 70px; }
+    h2 { font-size: 36px; }
+    .section-heading > p { margin-top: 18px; font-size: 15px; }
+  }
+</style>

@@ -1,0 +1,28 @@
+---
+import CallToActions from './CallToActions.astro';
+import PlatformLine from './PlatformLine.astro';
+import logo from '../assets/brand/refs-light.svg';
+---
+<section class="closing shell">
+  <img src={logo.src} width="88" height="88" alt="Refs Quote icon" />
+  <h2>Keep what catches you.</h2>
+  <p>Your next idea is already out there.</p>
+  <CallToActions iconSize={19} class="closing-actions" />
+  <PlatformLine class="closing-platform" />
+</section>
+
+<style>
+  .closing { padding-block: 96px 110px; border-top: 1px solid var(--line); text-align: center; }
+  img { margin-bottom: 28px; object-fit: contain; filter: drop-shadow(0 12px 24px #00000059); transform: rotate(-6deg); }
+  h2 { color: var(--yellow); font-size: clamp(39px, 6vw, 84px); letter-spacing: -.035em; }
+  .closing > p { margin: 20px 0 32px; color: var(--secondary); font-size: 17px; }
+  .closing :global(.closing-actions) { justify-content: center; gap: 14px; }
+  .closing :global(.closing-platform) { justify-content: center; margin-top: 20px; }
+  @media (max-width: 760px) {
+    .closing { padding-block: 51px 60px; }
+    img { width: 72px; height: 72px; }
+    h2 { font-size: 37px; }
+    .closing > p { font-size: 15px; }
+    .closing :global(.button) { font-size: 12px; }
+  }
+</style>

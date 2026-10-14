@@ -1,0 +1,192 @@
+---
+import ArrowRight from '../assets/icons/arrow-right.svg';
+import { downloadToken, setupPrompt, supportedAgents } from '../data/agentSetup';
+import { downloadUrl } from '../lib/links';
+import claude from '../assets/agents/claude.svg';
+import claudecode from '../assets/agents/claudecode.svg';
+import codex from '../assets/agents/codex.svg';
+import cursor from '../assets/agents/cursor.svg';
+import ohmypi from '../assets/agents/ohmypi.svg';
+import pi from '../assets/agents/pi.svg';
+
+// Single-color marks take the chip's text color; Oh My Pi keeps its own colors.
+const logos = { claude, claudecode, codex, cursor, ohmypi, pi };
+const fullColor = new Set(['ohmypi']);
+
+interface Props { image: string; }
+const { image } = Astro.props;
+const prompt = 'Use the spacing and quiet palette from my saved studio reference.';
+const installPrompt = setupPrompt.replace(downloadToken, downloadUrl);
+const reply = 'Got it. I’ll bring in the sage palette and leave generous space around one focal object, like your forme.example reference.';
+---
+<section class="agents shell" id="agents" aria-labelledby="agents-title">
+  <div>
+    <h2 id="agents-title">Your taste.<br />Your agent’s context.</h2>
+    <p>The hard part is explaining what you mean.<br />Give your coding agent something to see.</p>
+    <p class="agent-detail">Refs connects your local library to your coding agent through MCP. Your images, sources, and notes become context for the next build.</p>
+    <div class="works-with">
+      <h3 id="works-with-title">Works with</h3>
+      <ul aria-labelledby="works-with-title">
+        {supportedAgents.map(agent => (
+          <li>
+            {fullColor.has(agent.logo)
+              ? <img class="agent-logo" src={logos[agent.logo].src} width="20" height="15" alt="" />
+              : <span class="agent-logo agent-mark" style={`--logo: url(${logos[agent.logo].src})`} aria-hidden="true"></span>}
+            {agent.name}
+          </li>
+        ))}
+        <li class="any-agent">Any MCP agent</li>
+      </ul>
+    </div>
+    <div class="setup-prompt" id="setup-prompt">
+      <div class="setup-head">
+        <span><b>Set up in one prompt</b>It installs Refs if needed, then connects it to your agent.</span>
+        <button type="button" class="copy-prompt" id="copy-prompt">Copy prompt</button>
+      </div>
+      <pre class="prompt-text" id="prompt-text" data-download={downloadUrl} aria-label="Agent setup prompt">{installPrompt}</pre>
+      <div class="setup-foot">
+        <a class="manual-link" href="#connect-agent" id="connect-link">Manual setup <ArrowRight width={15} height={15} aria-hidden="true" /></a>
+      </div>
+      <p class="copy-feedback" id="prompt-status" role="status" aria-live="polite"></p>
+    </div>
+  </div>
+  <div class="agent-visual">
+    <div class="term mac-window" id="agent-term" role="img" aria-label="Illustrative coding agent session: the agent searches Refs for the studio reference, reads it, and replies using its palette and spacing.">
+      <div class="term-bar" aria-hidden="true"><span class="lights"><i></i><i></i><i></i></span><span>~/projects/forme-site</span></div>
+      <div class="term-body" aria-hidden="true">
+        <p class="t-user"><span class="t-prompt">›</span><span class="t-typed" data-text={prompt}>{prompt}</span></p>
+        <div class="t-call" data-step="1">
+          <p><span class="t-dot"></span><b>refs</b> · list_references<span class="t-args">(query: "studio")</span></p>
+          <p class="t-result">1 reference · forme.example</p>
+        </div>
+        <div class="t-call" data-step="2">
+          <p><span class="t-dot"></span><b>refs</b> · get_reference<span class="t-args">(id: "20261015-…", include_image: true)</span></p>
+          <div class="t-card"><img src={image} width="480" height="321" alt="" /><div><b>forme.example</b><small>Safari · image + note</small><p>“The quiet colors and generous space around a single object.”</p></div></div>
+        </div>
+        <p class="t-reply" data-step="3">{reply}</p>
+      </div>
+    </div>
+    <span class="visual-caption">Illustrative session. Connect an agent to use your real library.</span>
+  </div>
+</section>
+
+<script>
+  import { canAnimateOnScroll, wait, whenVisible } from '../lib/motion';
+
+  document.querySelector('#connect-link')!.addEventListener('click', () => {
+    document.querySelector<HTMLDetailsElement>('#connect-agent')!.open = true;
+  });
+
+  const promptCard = document.querySelector<HTMLElement>('#setup-prompt')!;
+  const promptText = promptCard.querySelector<HTMLElement>('#prompt-text')!;
+  const copyPrompt = promptCard.querySelector<HTMLButtonElement>('#copy-prompt')!;
+  const promptStatus = promptCard.querySelector<HTMLElement>('#prompt-status')!;
+  // Agents need an absolute URL; resolve the download against wherever this page is served.
+  const relativeDownload = promptText.dataset.download!;
+  promptText.textContent = promptText.textContent!.replace(relativeDownload, new URL(relativeDownload, location.href).href);
+  let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+  copyPrompt.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(promptText.textContent ?? '');
+      copyPrompt.textContent = 'Copied';
+      promptStatus.textContent = 'Prompt copied. Paste it into your coding agent.';
+      clearTimeout(copiedTimer);
+      copiedTimer = setTimeout(() => { copyPrompt.textContent = 'Copy prompt'; }, 1500);
+    } catch {
+      promptStatus.textContent = 'Clipboard access is unavailable. Select the prompt and copy it by hand.';
+    }
+  });
+
+  // Prompt types, tool calls resolve, then the reply streams in. Plays once.
+  const term = document.querySelector<HTMLElement>('#agent-term')!;
+  if (canAnimateOnScroll(term)) {
+    const typed = term.querySelector<HTMLElement>('.t-typed')!;
+    const calls = [...term.querySelectorAll<HTMLElement>('.t-call')];
+    const reply = term.querySelector<HTMLElement>('.t-reply')!;
+    const replyText = reply.textContent ?? '';
+    term.classList.add('is-armed');
+    typed.textContent = '';
+    whenVisible(term, async () => {
+      await wait(300);
+      for (const character of typed.dataset.text ?? '') { typed.textContent += character; await wait(22); }
+      for (const call of calls) {
+        await wait(350);
+        call.classList.add('is-shown', 'is-running');
+        await wait(850);
+        call.classList.replace('is-running', 'is-done');
+      }
+      await wait(450);
+      reply.textContent = '';
+      reply.classList.add('is-shown');
+      for (const word of replyText.split(' ')) { reply.textContent += (reply.textContent ? ' ' : '') + word; await wait(55); }
+    }, .5);
+  }
+</script>
+
+<style>
+  .agents { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 88px; padding-block: 107px; }
+  h2 { font-size: clamp(37px, 4vw, 53px); }
+  .agents > div > p { margin-top: 23px; color: var(--secondary); font-size: 17px; line-height: 1.7; }
+  .agents .agent-detail { max-width: 420px; font-size: 15px; line-height: 1.8; }
+  .works-with { margin-top: 26px; }
+  .works-with h3 { color: var(--secondary); font: 600 12px/1.4 Manrope, sans-serif; letter-spacing: 0; }
+  .works-with ul { display: flex; flex-wrap: wrap; gap: 8px; max-width: 460px; margin: 10px 0 0; padding: 0; list-style: none; }
+  .works-with li { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px 6px 9px; border: 1px solid var(--line); border-radius: 999px; color: var(--paper); font-size: 13px; font-weight: 600; }
+  .agent-logo { flex-shrink: 0; width: 15px; height: 15px; object-fit: contain; }
+  .agent-mark { background: currentColor; -webkit-mask: var(--logo) center / contain no-repeat; mask: var(--logo) center / contain no-repeat; }
+  img.agent-logo { width: 19px; }
+  .works-with .any-agent { padding-left: 12px; border-style: dashed; color: var(--secondary); }
+  .setup-prompt { max-width: 460px; margin-top: 24px; padding: 16px 16px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--raised); }
+  .setup-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  .setup-head b { display: block; color: var(--paper); font-size: 14px; }
+  .setup-head span { color: var(--secondary); font-size: 12px; line-height: 1.5; }
+  .copy-prompt { flex-shrink: 0; min-width: 104px; min-height: 36px; padding: 0 14px; border: 0; border-radius: 8px; background: var(--yellow); color: var(--ink); font-size: 13px; font-weight: 600; transition: background .2s; }
+  .copy-prompt:hover { background: var(--yellow-hover); }
+  .prompt-text { margin: 14px 0 0; padding: 12px 14px; border-radius: 8px; background: #1b1d1b; color: #dce3bd; font: 12px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .setup-foot { display: flex; justify-content: flex-end; margin-top: 8px; }
+  .manual-link:hover { color: var(--yellow); }
+  .manual-link { display: inline-flex; align-items: center; gap: 7px; min-height: 32px; color: var(--secondary); font-size: 12px; font-weight: 600; transition: color .2s; }
+  .copy-feedback { min-height: 18px; color: var(--yellow); font-size: 12px; }
+  .copy-feedback:empty { min-height: 0; }
+  .visual-caption { display: block; margin-top: 16px; color: var(--secondary); font-size: 12px; }
+
+  .term { background: #161716; }
+  .term-bar { position: relative; display: flex; align-items: center; height: 34px; padding: 0 14px; background: #202220; box-shadow: inset 0 -.5px 0 #000; }
+  .term-bar > span:last-child { position: absolute; left: 50%; color: #ffffff73; font: 500 11px var(--mac-font); transform: translateX(-50%); }
+  .term-body { min-height: 340px; padding: 18px 20px 22px; color: #e8e6dc; font: 12.5px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .t-user { display: flex; gap: 10px; padding: 10px 12px; border-radius: 8px; background: #ffffff0a; color: #f4f1e9; }
+  .t-prompt { color: var(--yellow); }
+  .t-call { margin-top: 16px; }
+  .t-call b { color: #f4f1e9; font-weight: 600; }
+  .t-args { color: #ffffff73; }
+  .t-dot { display: inline-block; width: 7px; height: 7px; margin-right: 9px; border-radius: 50%; background: var(--yellow); vertical-align: 1px; transition: background .3s; }
+  .t-result { position: relative; padding-left: 16px; color: #ffffff8c; }
+  .t-result::before { content: '└'; position: absolute; left: 1px; color: #ffffff40; }
+  .t-card { display: flex; gap: 12px; max-width: 430px; margin: 8px 0 0 16px; padding: 10px; border-radius: 8px; background: #f4f1e90d; font-family: var(--mac-font); clip-path: inset(0 0 0 0 round 8px); box-shadow: inset 0 0 0 .5px #ffffff1f; transition: clip-path .8s var(--ease), opacity .4s; }
+  .t-card img { flex-shrink: 0; width: 84px; height: 60px; border-radius: 5px; object-position: center 62%; }
+  .t-card b { display: block; font-size: 12px; }
+  .t-card small { display: block; color: #ffffff73; font-size: 10.5px; }
+  .t-card p { margin-top: 5px; color: #e8e6dc; font-size: 12px; line-height: 1.45; }
+  .t-reply { margin-top: 16px; color: #f4f1e9; font: 14px/1.6 var(--mac-font); }
+
+  [data-step] { transition: opacity .35s, transform .45s var(--ease); }
+  .term.is-armed [data-step] { opacity: 0; transform: translateY(6px); }
+  .term.is-armed [data-step].is-shown { opacity: 1; transform: none; }
+  .t-call.is-running .t-dot { background: #ffffff4d; animation: dot-pulse .5s ease-in-out infinite alternate; }
+  .t-call.is-running :is(.t-result, .t-card) { display: none; }
+  .term.is-armed .t-call:not(.is-done) .t-card { opacity: 0; clip-path: inset(0 0 100% 0 round 8px); }
+  @keyframes dot-pulse { to { background: #ffffffb3; } }
+
+  @media (max-width: 1100px) {
+    .agents { gap: 45px; }
+  }
+  @media (max-width: 760px) {
+    .agents { grid-template-columns: 1fr; gap: 30px; padding-block: 65px; }
+    h2 { font-size: 39px; }
+    .agents > div > p { font-size: 15px; }
+    .term-body { min-height: 0; padding: 16px; font-size: 11.5px; }
+    .t-card img { width: 64px; height: 48px; }
+    .t-reply { font-size: 13px; }
+    .setup-head { flex-direction: column; gap: 12px; }
+  }
+</style>

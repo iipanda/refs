@@ -1,0 +1,25 @@
+---
+import '../styles/global.css';
+import '../styles/mac.css';
+import favicon from '../assets/brand/refs-light.svg';
+import bricolage700 from '../assets/fonts/bricolage-700.woff2?url';
+
+interface Props { title: string; description: string; }
+const { title, description } = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#222423" />
+    <meta name="description" content={description} />
+    <title>{title}</title>
+    <link rel="icon" href={favicon.src} type="image/svg+xml" />
+    <link rel="preload" href={bricolage700} as="font" type="font/woff2" crossorigin />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <slot />
+  </body>
+</html>

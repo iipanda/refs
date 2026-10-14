@@ -1,0 +1,44 @@
+/* Shared pieces of the native macOS UI illustrations (dark appearance, yellow accent). */
+.mac { color: #ffffffe0; font-family: var(--mac-font); letter-spacing: 0; -webkit-font-smoothing: antialiased; }
+.mac :is(button, input):focus-visible { outline: 2px solid var(--mac-accent); outline-offset: -2px; }
+.mac-window { overflow: hidden; border-radius: 12px; box-shadow: 0 0 0 .5px #000000cc, inset 0 0 0 .5px #ffffff24, 0 24px 60px #00000070; }
+
+.lights { display: flex; gap: 7px; }
+.lights i { width: 11px; height: 11px; border-radius: 50%; background: #ff5f57; box-shadow: inset 0 0 0 .5px #0000002e; }
+.lights i:nth-child(2) { background: #febc2e; }
+.lights i:nth-child(3) { background: #28c840; }
+
+.mac-btn { display: inline-flex; align-items: center; height: 1.75em; padding: 0 .8em; border-radius: .42em; background: #ffffff2b; color: #fff; white-space: nowrap; box-shadow: inset 0 .5px 0 #ffffff26, 0 .5px 1px #00000066; transition: filter .12s; }
+.mac-btn.is-default { background: linear-gradient(#ffe14d, var(--mac-accent)); color: #1d1d1f; font-weight: 500; }
+.mac-btn.is-pressed { filter: brightness(.78); }
+.mac-btn.is-destructive { margin-left: auto; color: #ff6961; }
+
+.app-tile, .app-icon { display: inline-grid; flex-shrink: 0; place-items: center; color: #fff; font: 700 9px/1 var(--mac-font); }
+.app-tile { width: 14px; height: 14px; border-radius: 3.5px; }
+.app-icon { width: 1.75em; height: 1.75em; border-radius: .42em; }
+:is(.app-tile, .app-icon) svg { width: 74%; height: 74%; }
+.tile-browser { background: linear-gradient(#45a3ff, #1662e0); }
+.tile-f { background: #2d302d; color: #f4f1e9; font-family: Bricolage, sans-serif; box-shadow: inset 0 0 0 .5px #ffffff2e; }
+.tile-p { background: #f4f1e9; color: #262820; }
+.tile-n { background: #4a6a92; }
+.tile-l { background: #6c5bc4; }
+.tile-sketch { background: linear-gradient(#ffb547, #ef7a1a); }
+.tile-notes { background: linear-gradient(#83d48f, #37a155); }
+.video-badge { flex-shrink: 0; width: 13px; height: 13px; color: #ffffffa6; }
+
+/* Fixed-size illustrations, scaled to their column by fitStage(). */
+.stage { position: relative; }
+
+/* Capture overlay: 38% dimming around a hairline selection, with a pixel-size label. */
+.cap-overlay { position: absolute; inset: 0; z-index: 2; overflow: hidden; pointer-events: none; opacity: 0; transition: opacity .25s; }
+.sel { position: absolute; left: var(--sx); top: var(--sy); width: var(--sw); height: var(--sh); outline: 1.5px solid #fff; outline-offset: .75px; box-shadow: 0 0 0 2000px #00000061; }
+.sel-size { position: absolute; right: 12px; top: calc(100% + 12px); padding: 2px 6px; border-radius: 5px; background: #000000bf; color: #fff; font: 500 9px var(--mac-font); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Library toolbar, shared by the library window and the workflow demo. */
+.lib-toolbar { display: flex; flex-shrink: 0; align-items: center; gap: 12px; height: 52px; padding: 0 14px; box-shadow: inset 0 -.5px 0 #000000cc; }
+.lib-title { min-width: 0; white-space: nowrap; }
+.lib-title b { display: block; font-size: 13px; font-weight: 600; }
+.lib-title small { display: block; color: #ffffff8c; font-size: 10.5px; }
+.lib-search { display: flex; align-items: center; gap: 6px; width: 210px; height: 27px; margin-left: auto; padding: 0 9px; border-radius: 7px; background: #ffffff14; color: #ffffff73; font-size: 12px; transition: box-shadow .2s; }
+.lib-search svg { flex-shrink: 0; width: 13px; height: 13px; }
+.lib-search > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

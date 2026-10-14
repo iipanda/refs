@@ -1,0 +1,176 @@
+---
+import SavePanel from './SavePanel.svelte';
+import Rotate from '../assets/icons/rotate-clockwise.svg';
+import { macIcons } from '../lib/macIcons';
+
+interface Props { image: string; thumbImage: string; tinyImage: string; }
+const { image, thumbImage, tinyImage } = Astro.props;
+const note = 'The big type. The breathing room.';
+---
+<div class="hero-art">
+  <div class="stage-fit">
+    <div class="stage hero-stage" id="hero-stage" data-phase="menu" role="img" aria-label="Animated illustration: Refs selects an area of a sample website, saves it with a note, and the capture appears under Recent in the menu bar.">
+      <div class="desk mac" aria-hidden="true">
+        <div class="menubar">
+          <span class="mb-left"><b>Safari</b><span>File</span><span>Edit</span><span>View</span><span>History</span></span>
+          <span class="mb-right"><span class="mb-refs" set:html={macIcons.viewfinder} /><span>Wed 9:41</span></span>
+        </div>
+        <div class="browser">
+          <div class="browser-bar"><span class="lights"><i></i><i></i><i></i></span><span class="address">forme.example/objects</span></div>
+          <div class="sample-site">
+            <div class="sample-nav"><strong>forme.</strong><span>Objects</span><span>Studio</span><span>Journal</span></div>
+            <div class="sample-type">Less, but<br />considered.</div>
+            <p>Everyday objects. A different perspective.</p>
+            <div class="sample-photo"><img src={image} alt="" width="960" height="642" /><span>The everyday collection</span></div>
+          </div>
+        </div>
+        <div class="cap-overlay">
+          <div class="sel"><span class="sel-size">1230 × 960</span></div>
+          <Fragment set:html={macIcons.crosshair} />
+          <div class="hud"><span class="hud-source">Safari  ·  forme.example  ·  Objects — forme.</span><span class="hud-hint">Capture Area  ·  space to switch  ·  esc</span></div>
+        </div>
+        <SavePanel class="hero-save" {note} image={thumbImage} style="position:absolute;left:392px;top:118px;font-size:7.6px" />
+        <div class="mb-menu mac">
+          <span>Record Area…</span><span>Record Window…</span><hr />
+          <span>Capture Area<kbd>⇧⌘2</kbd></span><span>Capture Window<kbd>⇧⌘3</kbd></span><hr />
+          <span class="mi-head">Recent</span>
+          <span class="mi-recent is-new"><i class="mi-thumb" style={`background:url(${tinyImage}) center 62%/cover`}></i>forme.example – The big type. The breathing room…</span>
+          <span class="mi-recent"><i class="mi-thumb th-pricing-mini"></i>paperhouse.example – Pricing that doesn’t shout.</span>
+          <span class="mi-recent"><i class="mi-thumb th-toolbar-mini"></i>Sketchbook – Toolbar icons with one consistent…</span><hr />
+          <span>Open Library…</span><span>Settings…<kbd>⌘,</kbd></span><hr />
+          <span>Quit Refs<kbd>⌘Q</kbd></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="art-meta">
+    <span>Refs, illustrated with a sample website.</span>
+    <button class="art-replay" id="hero-replay" type="button" hidden>Replay <Rotate width={15} height={15} aria-hidden="true" /></button>
+  </div>
+</div>
+
+<script>
+  import { fitStage, prefersReducedMotion, tween, wait } from '../lib/motion';
+
+  const stage = document.querySelector<HTMLElement>('#hero-stage')!;
+  const selection = stage.querySelector<HTMLElement>('.sel')!;
+  const hud = stage.querySelector<HTMLElement>('.hud-source')!;
+  const typed = stage.querySelector<HTMLElement>('.sp-typed')!;
+  const save = stage.querySelector<HTMLElement>('.mac-btn.is-default')!;
+  const replay = document.querySelector<HTMLButtonElement>('#hero-replay')!;
+  const note = typed.textContent ?? '';
+  const source = hud.textContent ?? '';
+  const area = { x: 34, y: 118, width: 346, height: 270 };
+  const pixelScale = 3.555;
+  fitStage(stage);
+
+  function select(progress: number) {
+    const width = area.width * progress, height = area.height * progress;
+    selection.style.cssText = `--sx:${area.x}px;--sy:${area.y}px;--sw:${width}px;--sh:${height}px`;
+    selection.firstElementChild!.textContent = `${Math.round(width * pixelScale)} × ${Math.round(height * pixelScale)}`;
+    stage.style.setProperty('--cx', `${area.x + width}px`);
+    stage.style.setProperty('--cy', `${area.y + height}px`);
+  }
+
+  // Capture → note → save, ending on the menu-bar menu with the new capture under Recent.
+  let run = 0;
+  async function play() {
+    const current = ++run;
+    const live = () => current === run;
+    replay.hidden = true;
+    stage.dataset.phase = 'clean';
+    typed.textContent = '';
+    hud.textContent = 'Drag to select an area';
+    select(0);
+    await wait(600); if (!live()) return;
+    stage.dataset.phase = 'overlay';
+    await wait(700); if (!live()) return;
+    stage.dataset.phase = 'drag';
+    hud.textContent = source;
+    await tween(1100, select);
+    await wait(250); if (!live()) return;
+    stage.dataset.phase = 'panel';
+    await wait(550);
+    for (const character of note) {
+      if (!live()) return;
+      typed.textContent += character;
+      await wait(character === ' ' ? 75 : 34 + Math.random() * 38);
+    }
+    await wait(550); if (!live()) return;
+    save.classList.add('is-pressed');
+    await wait(170);
+    save.classList.remove('is-pressed');
+    stage.dataset.phase = 'saving';
+    await wait(800); if (!live()) return;
+    stage.dataset.phase = 'menu';
+    replay.hidden = false;
+  }
+
+  if (!prefersReducedMotion()) {
+    replay.addEventListener('click', play);
+    play();
+  }
+</script>
+
+<style>
+  .hero-art { position: relative; min-width: 0; animation: art-enter 900ms var(--ease) both; }
+  .stage-fit { width: 100%; }
+  .hero-stage { --design-w: 640; width: 640px; height: 460px; }
+  .desk { position: absolute; inset: 0; overflow: hidden; border-radius: 14px; background: radial-gradient(120% 90% at 88% 6%, #5d5b3b 0, transparent 55%), radial-gradient(90% 80% at 0 100%, #3b4943 0, transparent 62%), #2a2c29; box-shadow: 0 30px 70px #00000070, 0 0 0 1px #ffffff14; }
+  .menubar { position: absolute; inset: 0 0 auto; z-index: 1; display: flex; align-items: center; justify-content: space-between; height: 24px; padding: 0 10px 0 14px; background: #1d1e1c8c; color: #fff; font-size: 10px; -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+  .mb-left { display: flex; gap: 13px; }
+  .mb-left b { font-weight: 700; }
+  .mb-right { display: flex; align-items: center; gap: 10px; }
+  .mb-refs { display: grid; place-items: center; width: 24px; height: 18px; border-radius: 4px; transition: background .2s; }
+  .mb-refs :global(svg) { width: 13px; height: 13px; }
+  .browser { position: absolute; left: 24px; top: 44px; width: 452px; height: 396px; overflow: hidden; border-radius: 10px; background: #f7f5ee; color: var(--ink); box-shadow: 0 0 0 .5px #0000004d, 0 18px 40px #00000059; }
+  .browser-bar { position: relative; display: flex; align-items: center; height: 30px; padding: 0 12px; background: #ebe9e1; box-shadow: inset 0 -1px 0 #d9d6cb; }
+  .browser-bar .lights { gap: 6px; }
+  .browser-bar .lights i { width: 9px; height: 9px; }
+  .address { position: absolute; left: 50%; padding: 3px 42px; border-radius: 6px; background: #dedbd1; color: #55574c; font: 500 9.5px var(--mac-font); transform: translateX(-50%); }
+  .sample-site { padding: 16px 22px; }
+  .sample-nav { display: flex; align-items: center; gap: 14px; font: 9px var(--mac-font); }
+  .sample-nav strong { margin-right: auto; font: 700 18px/1 Bricolage, sans-serif; }
+  .sample-type { margin-top: 26px; font: 600 44px/1.02 Bricolage, sans-serif; letter-spacing: -.03em; }
+  .sample-site p { margin-top: 10px; color: #4b4c42; font: 9.5px var(--mac-font); }
+  .sample-photo { position: relative; height: 170px; margin-top: 16px; overflow: hidden; border-radius: 3px; }
+  .sample-photo img { width: 100%; height: 100%; object-position: center 64%; }
+  .sample-photo span { position: absolute; left: 12px; bottom: 10px; font: 8.5px var(--mac-font); }
+  .hero-stage .sel { --sx: 34px; --sy: 118px; --sw: 346px; --sh: 270px; }
+  .cap-overlay :global(.crosshair) { position: absolute; left: calc(var(--cx, 380px) - 11px); top: calc(var(--cy, 388px) - 11px); width: 22px; height: 22px; opacity: 0; }
+  .hud { position: absolute; left: 50%; top: 34px; display: flex; align-items: center; gap: 14px; height: 25px; padding: 0 11px; border-radius: 8px; background: #1c1c1ce0; color: #fff; font-size: 9.5px; font-weight: 500; white-space: pre; transform: translateX(-50%); }
+  .hud-hint { color: #ffffffb3; font-size: 8.5px; font-weight: 400; }
+
+  /* Phases: clean → overlay → drag → panel → saving → menu (the resting state). */
+  .hero-stage:is([data-phase='overlay'], [data-phase='drag'], [data-phase='panel']) .cap-overlay { opacity: 1; }
+  .hero-stage[data-phase='drag'] .cap-overlay :global(.crosshair) { opacity: 1; }
+  .desk :global(.save-panel.hero-save) { z-index: 3; opacity: 0; transform: scale(.96); transform-origin: top right; filter: blur(4px); transition: opacity .35s, transform .5s var(--ease), filter .35s; }
+  .hero-stage[data-phase='panel'] .desk :global(.save-panel.hero-save) { opacity: 1; transform: none; filter: none; }
+  .hero-stage[data-phase='panel'] .desk :global(.hero-save .caret) { opacity: 1; animation: caret-blink 1s steps(1) 4; }
+  .hero-stage[data-phase='saving'] .desk :global(.save-panel.hero-save) { opacity: 0; transform: translate(-56px, -106px) scale(.04); filter: none; transition: transform .55s cubic-bezier(.55, 0, .8, .25), opacity .3s .25s; }
+  .hero-stage[data-phase='saving'] .mb-refs { animation: refs-pulse .5s .45s var(--ease); }
+  .hero-stage[data-phase='menu'] .mb-refs { background: #ffffff38; }
+
+  .mb-menu { position: absolute; right: 6px; top: 27px; z-index: 4; display: flex; flex-direction: column; width: 304px; padding: 5px; border-radius: 8px; background: #2b2b2bf2; font-size: 10.5px; opacity: 0; clip-path: inset(0 0 100% 0 round 8px); box-shadow: 0 0 0 .5px #000000b3, inset 0 0 0 .5px #ffffff26, 0 12px 30px #00000073; transition: clip-path .45s var(--ease), opacity .2s; }
+  .hero-stage[data-phase='menu'] .mb-menu { opacity: 1; clip-path: inset(0 0 0 0 round 8px); }
+  .mb-menu > span { display: flex; align-items: center; gap: 7px; height: 20px; padding: 0 9px; overflow: hidden; border-radius: 4px; white-space: nowrap; }
+  .mb-menu kbd { margin-left: auto; color: #ffffff73; font: inherit; }
+  .mb-menu hr { width: calc(100% - 18px); height: .5px; margin: 4px 9px; border: 0; background: #ffffff26; }
+  .mb-menu .mi-head { color: #ffffff66; font-size: 9.5px; font-weight: 500; }
+  .hero-stage[data-phase='menu'] .mi-recent.is-new { animation: new-flash 1.8s .35s ease-out both; }
+  .mi-thumb { flex-shrink: 0; width: 30px; height: 19px; overflow: hidden; border-radius: 3px; }
+  .th-pricing-mini { background: linear-gradient(90deg, #f1efe6 0 30%, #d4d1c3 0 35%, var(--mac-accent) 0 65%, #d4d1c3 0 70%, #f1efe6 0); }
+  .th-toolbar-mini { background: linear-gradient(#3b3e3b 0 34%, #232523 0); }
+
+  .art-meta { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 30px; margin-top: 14px; color: var(--secondary); font-size: 11px; }
+  .art-replay { display: inline-flex; align-items: center; gap: 8px; padding: 6px 0; border: 0; background: none; color: var(--secondary); font-size: 12px; font-weight: 600; }
+  .art-replay:hover { color: var(--yellow); }
+
+  @keyframes art-enter { from { opacity: .5; transform: translateY(22px); } }
+  @keyframes refs-pulse { 40% { background: #ffd60a8c; transform: scale(1.15); } }
+  @keyframes caret-blink { 50% { opacity: 0; } }
+  @keyframes new-flash { 0%, 35% { background: #ffd60a47; } 100% { background: transparent; } }
+  @media (max-width: 760px) {
+    .hero-art { width: 100%; max-width: 560px; margin: 0 auto; }
+  }
+</style>

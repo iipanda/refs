@@ -1,0 +1,67 @@
+---
+import { claudeCommand as command } from '../data/agentSetup';
+---
+<section class="questions shell" id="setup" aria-labelledby="questions-title">
+  <h2 id="questions-title">A few good questions.</h2>
+  <div class="faq">
+    <details>
+      <summary>What does Refs capture?<span class="faq-icon" aria-hidden="true"></span></summary>
+      <p>Capture an area or a window as a screenshot, or record a silent video. Add a short note and Refs saves it with the source app or website.</p>
+    </details>
+    <details>
+      <summary>Where do my references live?<span class="faq-icon" aria-hidden="true"></span></summary>
+      <p>On your Mac, in a local folder. You can choose the library location in Settings. Refs doesn’t need a cloud account to store your references.</p>
+    </details>
+    <details id="connect-agent">
+      <summary>How do I connect a coding agent?<span class="faq-icon" aria-hidden="true"></span></summary>
+      <p>Paste the setup prompt from <a href="#agents">the agents section</a> into your coding agent. It installs Refs if needed, connects it and checks the connection. To set it up by hand, Refs Settings → Agents has instructions for each tool. For Claude Code, run:</p>
+      <div class="setup-code"><code>{command}</code><button id="copy-setup" type="button">Copy command</button></div>
+      <p id="setup-status" role="status" aria-live="polite"></p>
+    </details>
+    <details>
+      <summary>What do I need to run it?<span class="faq-icon" aria-hidden="true"></span></summary>
+      <p>The current build supports Apple Silicon Macs running macOS 14 or later. Screen Recording permission enables capture; browser Automation permission lets Refs save the website source.</p>
+    </details>
+  </div>
+</section>
+
+<script>
+  document.querySelector('#copy-setup')!.addEventListener('click', async () => {
+    const status = document.querySelector('#setup-status')!;
+    try {
+      await navigator.clipboard.writeText(document.querySelector('.setup-code code')!.textContent ?? '');
+      status.textContent = 'Command copied. Run it in your terminal to connect Claude Code.';
+    } catch {
+      status.textContent = 'Clipboard access is unavailable. Select and copy the text above.';
+    }
+  });
+</script>
+
+<style>
+  .questions { display: grid; grid-template-columns: .9fr 1.1fr; gap: 72px; padding-block: 16px 75px; }
+  h2 { position: sticky; top: 124px; align-self: start; max-width: 260px; font-size: 35px; }
+  details { border-bottom: 1px solid var(--line); }
+  details:first-child { border-top: 1px solid var(--line); }
+  summary { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 22px 0; font-size: 15px; font-weight: 600; list-style: none; cursor: pointer; transition: color .2s; }
+  summary:hover { color: var(--yellow); }
+  summary::-webkit-details-marker { display: none; }
+  .faq-icon { flex-shrink: 0; width: 16px; height: 16px; background: var(--secondary); mask: url('../assets/icons/plus.svg') center / contain no-repeat; transition: transform .3s var(--ease), background .2s; }
+  summary:hover .faq-icon, details[open] .faq-icon { background: var(--yellow); }
+  details[open] .faq-icon { transform: rotate(45deg); }
+  details > p a { color: var(--paper); text-decoration: underline; text-decoration-color: #8b8f7d; }
+  details > p a:hover { color: var(--yellow); }
+  details > p { max-width: 62ch; padding-bottom: 22px; color: var(--secondary); font-size: 15px; line-height: 1.8; }
+  .setup-code { margin: 0 0 17px; padding: 12px; border-radius: 5px; background: #2d3129; }
+  .setup-code code { display: block; color: #dce3bd; font: 12px/1.8 ui-monospace, SFMono-Regular, monospace; overflow-wrap: anywhere; }
+  .setup-code button { min-height: 34px; margin-top: 10px; padding: 6px 12px; border: 1px solid #717958; border-radius: 5px; background: none; color: var(--paper); font-size: 12px; font-weight: 600; transition: color .2s, border-color .2s; }
+  .setup-code button:hover { border-color: var(--yellow); color: var(--yellow); }
+  @media (max-width: 1100px) {
+    .questions { gap: 35px; }
+  }
+  @media (max-width: 760px) {
+    .questions { grid-template-columns: 1fr; gap: 28px; padding-block: 5px 50px; }
+    h2 { position: static; max-width: none; font-size: 30px; }
+    summary { padding-block: 18px; font-size: 14px; }
+    .setup-code button { min-height: 44px; }
+  }
+</style>

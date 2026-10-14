@@ -1,0 +1,16 @@
+<section class="intro shell">
+  <p>Some things make you stop scrolling. <span>Keep the thing. And the thought.</span></p>
+  <span class="intro-detail">A menu-bar app for the little details<br />that become your next big idea.</span>
+</section>
+
+<style>
+  .intro { display: flex; align-items: flex-end; justify-content: space-between; gap: 48px; padding-block: 16px 72px; border-bottom: 1px solid var(--line); }
+  p { font: 600 clamp(28px, 3.1vw, 42px)/1.18 Bricolage, sans-serif; letter-spacing: -.025em; text-wrap: balance; }
+  p span { display: block; color: var(--secondary); text-wrap: balance; }
+  .intro-detail { flex-shrink: 0; padding-bottom: 6px; color: var(--secondary); font-size: 14px; line-height: 1.75; }
+  @media (max-width: 760px) {
+    .intro { display: block; padding-block: 8px 46px; }
+    p { font-size: 27px; }
+    .intro-detail { display: block; margin-top: 20px; font-size: 13px; }
+  }
+</style>
