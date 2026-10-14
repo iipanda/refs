@@ -163,7 +163,6 @@
       {/if}
     </div>
   </div>
-  <div class="demo-caption"><span>Interactive example</span><span>No screen access. This sample stays in your browser.</span></div>
 </div>
 
 <style>
@@ -217,7 +216,6 @@
   .reference-output > span { color: var(--yellow); font-size: 12px; }
   .reference-output p { margin-top: 9px; color: var(--paper); font-size: 13px; line-height: 1.7; white-space: pre-line; overflow-wrap: anywhere; }
   .copy-status { min-height: 20px; margin-top: 10px; color: var(--yellow); font-size: 12px; }
-  .demo-caption { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px 28px; border-top: 1px solid var(--line); color: var(--secondary); font-size: 12px; }
 
   @keyframes panel-in { from { opacity: 0; transform: translateY(10px) scale(.96); filter: blur(6px); } }
   @keyframes card-land { from { opacity: 0; transform: translateY(-16px) scale(.9); } }
@@ -246,9 +244,6 @@
     .demo-explanation { align-items: start; min-height: 330px; padding: 30px 25px; }
     .demo-copy { max-width: none; }
     .demo-copy h3 { font-size: 29px; }
-    .demo-caption { display: block; padding: 12px 16px; }
-    .demo-caption span { display: block; }
-    .demo-caption span + span { margin-top: 4px; }
   }
   @media (max-width: 360px) {
     .demo-controls { gap: 9px; padding-inline: 13px; }

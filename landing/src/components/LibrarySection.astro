@@ -14,7 +14,6 @@ const features = ['Screenshots and screen recordings', 'App and website sources,
     </div>
     <div class="library-window-wrap">
       <LibraryWindow client:load image={thumbImage} />
-      <p class="library-caption">A sample library. Search it, or pick a source or tag.</p>
     </div>
   </div>
 </section>
@@ -28,7 +27,6 @@ const features = ['Screenshots and screen recordings', 'App and website sources,
   li { position: relative; padding: 7px 0 7px 22px; }
   li::before { content: ''; position: absolute; left: 0; top: 11px; width: 13px; height: 13px; background: var(--ink); mask: url('../assets/icons/check.svg') center / contain no-repeat; }
   .library-window-wrap { min-width: 0; }
-  .library-caption { margin-top: 16px; color: var(--muted-ink); font-size: 13px; font-weight: 600; }
   @media (max-width: 1100px) {
     .library-layout { gap: 35px; }
   }
