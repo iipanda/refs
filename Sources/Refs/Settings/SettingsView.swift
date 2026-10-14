@@ -289,14 +289,7 @@ private struct AgentsTab: View {
 
     private var setupPrompt: String {
         """
-        Connect this coding agent to my local Refs library via MCP.
-        Server: refs
-        Executable: \(helperPath)
-        Transport: stdio, no arguments.
-
-        Identify this client and its installed version. Add Refs to its user-level MCP configuration, preserving other servers and settings. For Pi Agent or OMP, use built-in MCP support when available; check the installed version first.
-
-        Verify with get_library_info and list_references (limit: 1). Do not add, edit or remove references during setup. Report success only after the calls work, or explain any required restart or reload.
+        Connect my Refs library to this agent over MCP: add a stdio server named "refs" that runs \(helperPath) with no arguments to your user-level config, keeping existing servers. Then call get_library_info to confirm it works, or tell me if you need a restart.
         """
     }
 
