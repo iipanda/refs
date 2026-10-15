@@ -15,11 +15,18 @@ import studio from '../assets/studio.jpg';
 // One sourced photo, sized for each place it appears.
 const [large, thumb, tiny] = await Promise.all([960, 480, 120].map(width => getImage({ src: studio, width, format: 'webp' })));
 const image = large.src, thumbImage = thumb.src, tinyImage = tiny.src;
+const siteSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'Refs',
+  url: new URL('/', Astro.site).href,
+};
 ---
 <BaseLayout
-  title="Refs | Good ideas. Kept close."
-  description="Save the UI you love, remember why, and bring it into your next build. Refs is a local macOS reference library for designers and developers."
+  title="Refs | UI Reference Library for macOS"
+  description="Capture screenshots and videos, save notes and sources, and share UI references with coding agents. Refs is a free, local reference library for macOS."
 >
+  <script slot="head" type="application/ld+json" set:html={JSON.stringify(siteSchema).replace(/</g, '\\u003c')} />
   <SiteHeader />
   <main id="main">
     <Hero {image} {thumbImage} {tinyImage} />

@@ -1,0 +1,18 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+<BaseLayout title="Page not found | Refs" description="We couldn’t find that page. Return to Refs, your local UI reference library for macOS." noindex>
+  <main id="main" class="shell">
+    <p class="error-code">404</p>
+    <h1>Nothing saved here.</h1>
+    <p>We couldn’t find that page.</p>
+    <a class="button button-yellow" href="/">Back to Refs</a>
+  </main>
+</BaseLayout>
+
+<style>
+  main { display: flex; min-height: 100svh; flex-direction: column; align-items: flex-start; justify-content: center; gap: 24px; padding-block: 64px; }
+  .error-code { color: var(--yellow); font-weight: 600; letter-spacing: .12em; }
+  h1 { max-width: 12ch; font-size: clamp(48px, 8vw, 88px); }
+  p { color: var(--secondary); font-size: 18px; }
+</style>
