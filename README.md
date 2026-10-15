@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://refs-76w.pages.dev"><strong>Explore Refs ↗</strong></a>
+  <a href="https://refsapp.pages.dev"><strong>Explore Refs ↗</strong></a>
   &nbsp; · &nbsp;
   <a href="#get-started">Get started</a>
   &nbsp; · &nbsp;
@@ -89,5 +89,5 @@ open build/Refs.app
 
 <p align="center">
   <strong>Save the UI you love. Remember why.</strong><br />
-  <a href="https://refs-76w.pages.dev">Take a look at Refs ↗</a>
+  <a href="https://refsapp.pages.dev">Take a look at Refs ↗</a>
 </p>
