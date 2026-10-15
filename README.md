@@ -1,126 +1,93 @@
-# Refs
+<p align="center">
+  <img src="docs/assets/readme-hero.svg" alt="Refs — Good ideas. Kept close. An illustrated library of UI references, notes, and tags." width="100%" />
+</p>
 
-A lightweight macOS menu-bar app for saving UI screenshots and videos as design references. Each capture records
-the app or website it came from and one line about what you like, and coding agents can read the
-library over MCP.
+<p align="center">
+  A little macOS app for the details that become your next idea.<br />
+  Save screenshots and videos with their source and a note. Bring them into your next build with MCP.
+</p>
 
-## Build
+<p align="center">
+  <a href="https://refs-76w.pages.dev"><strong>Explore Refs ↗</strong></a>
+  &nbsp; · &nbsp;
+  <a href="#get-started">Get started</a>
+  &nbsp; · &nbsp;
+  <a href="#bring-your-references-to-your-agent">Connect your agent</a>
+  &nbsp; · &nbsp;
+  <a href="docs/development.md">Build from source</a>
+</p>
 
-Requires macOS 14+, Xcode 26+ (Swift 6 toolchain and Icon Composer asset compiler) on Apple Silicon.
+<p align="center"><sub>macOS 14+ &nbsp; · &nbsp; Apple Silicon &nbsp; · &nbsp; Local files &nbsp; · &nbsp; MCP</sub></p>
 
-```sh
-swift test                 # core and MCP tests
-./scripts/build-app.sh     # builds and signs build/Refs.app
-open build/Refs.app
-```
+## Keep the thing. And the thought.
 
-The script signs with your first Apple Development or Developer ID identity. Keep the same identity
-between builds: macOS ties Screen Recording and browser Automation permissions to it.
+A good layout, a quiet color palette, a small interaction that feels right. Refs keeps the UI you notice together with where it came from and what you liked about it.
 
-The app icon uses the selected hand-shaded Quote direction. Editable light and dark masters
-are `Resources/AppIcon-light.svg`, `Resources/AppIcon.svg` and their `.vectorcraft` counterparts.
-The dark tile uses a neutral gray gradient matched to the Icon Composer rendition.
-`Resources/Refs.icon` packages PNG renders of that approved artwork for Default and Dark,
-plus separate opaque white vector quotes for Clear/Mono. The authored depth is retained;
-Composer supplies appearance switching and the Clear container rather than repainting the faces.
-`scripts/build-icon.sh` compiles `Refs.icns` and `Assets.car`, which are included before signing.
-Regular app builds do not require VectorCraft.
+| Capture the detail | Keep the context | Use it again |
+| --- | --- | --- |
+| Grab an area or window. Record a silent video when the motion matters. | Refs saves the app or website. Add one line about what caught your eye. | Find it by source, note, or tag. Let your coding agent read it through MCP. |
 
-## Use
+### A library that feels like you
 
-- **⌘⇧2** captures an area, **⌘⇧3** a window. Space switches between the two while selecting, and Esc cancels.
-- **Record Area… / Record Window…** in the menu bar or File menu starts a silent video with the cursor visible. Select the source, then use the floating **Stop** button (or either capture shortcut) to finish. Videos are H.264 MP4 at up to 30 fps and 3840 pixels on the longest edge.
-- Videos play in the save panel and Library inspector; double-click opens the movie in your default player. MCP supplies a poster frame and the movie path.
-- After capturing, type what you like and press Return. Esc discards.
-- The library groups references by app (native apps) and website (browser captures).
-- Organize references with color-coded tags. Select a tag in the sidebar to filter the library;
-  search also matches tag names. Add tags while saving, from the save panel's Add Tag button, or
-  later from the inspector: the tag picker finds a tag as you type, and Return creates a new one with
-  an automatic color. Select several cards to tag them together in the inspector or the context
-  menu's Tags submenu. A dashed chip means only some selected references have that tag; click it
-  to add it to all of them.
-- Create a tag with the + beside Tags in the sidebar. Right-click a sidebar tag to rename it,
-  choose a system color, or delete it. Deleting a tag
-  removes it from references, including Trash, without deleting the references. Moving a reference
-  to Trash keeps its tags for restoration.
+- **Images and motion together.** Keep screenshots and screen recordings in one searchable library.
+- **Sources remembered.** Browse by app or website and return to the original URL when available.
+- **Tags for the threads you collect.** Group typography, pricing pages, interactions, or whatever you keep noticing. Tag several references at once.
+- **A home on your Mac.** Your library is a folder of media and JSON files. Choose its location in Settings.
+- **Context for your next build.** Give your coding agent the reference, its source, and your note through MCP.
 
-⌘⇧3 is also macOS's "Save picture of screen" shortcut. Turn that off in System Settings › Keyboard ›
-Keyboard Shortcuts › Screenshots, or pick another shortcut in Refs' Settings.
+## Get started
 
-Permissions (a setup window walks through both on first launch):
-- **Screen Recording** is required. Quit and reopen Refs after granting it.
-- **Automation**, once per browser, to read the URL and title of the active tab. "Allow All Browsers"
-  asks each installed browser in turn. Any browser with Safari- or Chrome-style tab scripting works
-  (Safari, Chrome, Arc, Helium, Brave, Edge and other Chromium forks). Firefox and Zen don't support it,
-  so captures from them record the window title only.
+The [website](https://refs-76w.pages.dev) has the current Mac download. You can also [build Refs from source](docs/development.md).
 
-## Agents (MCP)
+1. Move **Refs.app** into **Applications** and open it.
+2. Follow setup to allow **Screen Recording**, then quit and reopen Refs. Allow browser **Automation** to save website URLs and titles.
+3. Capture something, add what you like about it, and press **Return**.
 
-`Refs.app/Contents/MacOS/refs-mcp` is a stdio MCP server that reads and manages the library folder directly,
-so it works even when the app isn't running. Settings › Agents opens with a copyable prompt that asks
-your coding agent to configure Refs and verify the connection. Collapsible manual instructions cover Claude Code, Codex, Cursor,
-Claude Desktop, Pi Agent and OMP (Oh My Pi). For example:
+| Action | Shortcut or control |
+| --- | --- |
+| Capture an area | **⌘⇧2** |
+| Capture a window | **⌘⇧3** |
+| Switch area ↔ window while selecting | **Space** |
+| Record a video | **Record Area…** or **Record Window…** in the menu bar |
+| Cancel a capture | **Esc** |
+
+Shortcuts are configurable. If **⌘⇧3** takes a full-screen screenshot instead, change that shortcut in macOS or Refs.
+
+The current download is a signed development build, not a notarized release. [More about capture, permissions, tags, and storage →](docs/usage.md)
+
+## Bring your references to your agent
+
+Open **Refs → Settings → Agents** and copy the setup prompt into your coding agent. Manual instructions are included for Claude Code, Codex, Cursor, Claude Desktop, Pi, and Oh My Pi.
+
+For Claude Code:
 
 ```sh
 claude mcp add --scope user refs -- /Applications/Refs.app/Contents/MacOS/refs-mcp
 ```
 
-Tools:
-- Read: `list_references(query?, app?, site?, tag?, limit?, kind?, cursor?, include_trashed?)`,
-  `get_reference(id, include_image?, max_size?)`, `list_sources()`, `list_tags()`, `get_library_info()`.
-  Filter `tag` by its stable ID or case-insensitive name. Free-text `query` also searches tag names.
-  Reference metadata includes resolved tags with their IDs, names and colors; `list_tags` reports
-  active-reference counts, and `get_library_info` includes `tag_count`.
-- Add: `add_references(items: [{path, note?, title?, source?}])`. Supply 1–100 absolute local paths.
-  PNG/JPEG/HEIC/WebP become PNG; MP4/MOV keep their container and receive a poster.
-  Originals stay untouched. Identical media returns `existing` without overwriting metadata.
-- Edit: `update_reference(id, patch, expected_revision)`. Read the revision first. Patch `note`,
-  `title`, or `source: {app?, bundle_id?, url?}`. Omitted fields stay unchanged; null clears optional
-  title, bundle ID or URL; an empty note clears the note. A stale revision returns the current reference.
-- Manage: `trash_references(ids)` and `restore_references(ids)`. Trash retains media and notes.
-  The app's removal actions use the same Trash, with Restore in the sidebar's Trash section.
-- Tags: `create_tag(name, color?)`, `update_tag(id, name?, color?, expected_revision?)`,
-  `delete_tag(id, expected_revision?)`, `tag_references(ids, tag_ids)`,
-  `untag_references(ids, tag_ids)`. Names are trimmed and unique case-insensitively. Colors are
-  `red`, `orange`, `yellow`, `green`, `mint`, `teal`, `blue`, `indigo`, `purple`, `pink`, `brown`,
-  or `gray`; an omitted creation color picks an unused color where possible. Tag updates return
-  a revision; pass `expected_revision` to reject stale rename, recolor or deletion requests.
-  Bulk tagging accepts 1–100 reference IDs and tag IDs, adds or removes memberships without
-  replacing other tags, and returns a result for every reference. Repeated membership changes
-  are safe. Deleting a tag removes its memberships from active and trashed references.
+Then ask for something concrete:
 
-Tools return structured results alongside readable text. Add/trash/restore/tag/untag return per-item results,
-including partial failures; list returns `next_cursor`. The app refreshes when MCP writes to its
-active library. Metadata edits use revisions and a cross-process library lock to prevent lost edits.
-`get_library_info` reports the actual library path and counts; access failures are explicit errors.
-Tag changes share the same library lock; membership changes advance reference revisions, so an
-older `update_reference` request cannot overwrite them. Rename and color changes only update the
-tag catalog. The app also refreshes its tags when another MCP process changes the library.
+> Find my references tagged “Typography” and use their spacing and type hierarchy as a starting point for this page.
 
-Example tool arguments for adding one existing reference:
+The bundled MCP helper can search and read references, import local media, edit notes, manage tags, and move items into or out of Trash. It works even when the app is closed.
 
-```json
-{"items":[{"path":"/absolute/path/menu.png","note":"Clear grouping","source":{"app":"Example App"}}]}
+[MCP tools and examples →](docs/mcp.md)
+
+## Build from source
+
+Requires **macOS 14+**, **Apple Silicon**, and **Xcode 26+** with its Swift toolchain and Icon Composer compiler.
+
+```sh
+swift test
+./scripts/build-app.sh
+open build/Refs.app
 ```
 
-After creating a tag, use its returned ID to tag several references in one call:
+[Build, signing, icon sources, and repository layout →](docs/development.md)
 
-```json
-{"ids":["reference-id-1","reference-id-2"],"tag_ids":["tag-id"]}
-```
+---
 
-## Storage
-
-`~/Library/Application Support/Refs/Library/`, as `<id>.png` + `<id>.json` pairs, with an additional `<id>.mp4` for videos. The folder can be changed
-in Settings; `REFS_LIBRARY=/path` overrides it for both the app and the MCP helper.
-The library also contains `tags.json`, a catalog of stable tag IDs, names, palette colors and
-revisions. Reference sidecars store only their `tagIDs`, so renaming or recoloring a tag does not
-rewrite references. Existing libraries with no catalog or tag IDs load as untagged, without a
-migration rewrite. Tags travel with the library folder.
-
-## Layout
-
-- `Sources/RefsCore`: reference model, library store, search, image coding
-- `Sources/RefsMCP`, `Sources/refs-mcp`: MCP server and its stdio entry point
-- `Sources/Refs`: the app (AppKit + SwiftUI)
-- `mocks/`, `spikes/`: v1 UI mocks and research notes
+<p align="center">
+  <strong>Save the UI you love. Remember why.</strong><br />
+  <a href="https://refs-76w.pages.dev">Take a look at Refs ↗</a>
+</p>
