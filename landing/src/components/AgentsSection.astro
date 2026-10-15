@@ -1,7 +1,6 @@
 ---
 import ArrowRight from '../assets/icons/arrow-right.svg';
-import { downloadToken, setupPrompt, supportedAgents } from '../data/agentSetup';
-import { downloadUrl } from '../lib/links';
+import { setupPrompt, supportedAgents } from '../data/agentSetup';
 import claude from '../assets/agents/claude.svg';
 import claudecode from '../assets/agents/claudecode.svg';
 import codex from '../assets/agents/codex.svg';
@@ -16,7 +15,6 @@ const fullColor = new Set(['ohmypi']);
 interface Props { image: string; }
 const { image } = Astro.props;
 const prompt = 'Use the spacing and quiet palette from my saved studio reference.';
-const installPrompt = setupPrompt.replace(downloadToken, downloadUrl);
 const reply = 'Got it. I’ll bring in the sage palette and leave generous space around one focal object, like your forme.example reference.';
 ---
 <section class="agents shell" id="agents" aria-labelledby="agents-title">
@@ -43,7 +41,7 @@ const reply = 'Got it. I’ll bring in the sage palette and leave generous space
         <span><b>Set up in one prompt</b>It installs Refs if needed, then connects it to your agent.</span>
         <button type="button" class="copy-prompt" id="copy-prompt">Copy prompt</button>
       </div>
-      <pre class="prompt-text" id="prompt-text" data-download={downloadUrl} aria-label="Agent setup prompt">{installPrompt}</pre>
+      <pre class="prompt-text" id="prompt-text" aria-label="Agent setup prompt">{setupPrompt}</pre>
       <div class="setup-foot">
         <a class="manual-link" href="#connect-agent" id="connect-link">Manual setup <ArrowRight width={15} height={15} aria-hidden="true" /></a>
       </div>
@@ -80,9 +78,6 @@ const reply = 'Got it. I’ll bring in the sage palette and leave generous space
   const promptText = promptCard.querySelector<HTMLElement>('#prompt-text')!;
   const copyPrompt = promptCard.querySelector<HTMLButtonElement>('#copy-prompt')!;
   const promptStatus = promptCard.querySelector<HTMLElement>('#prompt-status')!;
-  // Agents need an absolute URL; resolve the download against wherever this page is served.
-  const relativeDownload = promptText.dataset.download!;
-  promptText.textContent = promptText.textContent!.replace(relativeDownload, new URL(relativeDownload, location.href).href);
   let copiedTimer: ReturnType<typeof setTimeout> | undefined;
   copyPrompt.addEventListener('click', async () => {
     try {

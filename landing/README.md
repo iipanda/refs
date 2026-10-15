@@ -43,11 +43,9 @@ The sample library window filters by search and by sidebar source, and a new cap
 The three tabs support arrow keys, Home and End. Reset restores the sample. Empty notes have a recovery message. Copy actions report clipboard failures. With reduced motion, every illustration renders in its final state without playing. The page has no repeating animation loop, tracking, form submission or external API call.
 
 The example website and agent handoff are illustrative. They don't request screen access or read the owner's reference library.
-- The primary CTA downloads `downloads/Refs-macOS.zip`.
-- The secondary action opens the GitHub repository. It is currently private, so it needs to be public before launch.
+- The primary CTA downloads the latest DMG from GitHub Releases.
+- The secondary action opens the GitHub repository.
 - The header links to the walkthrough, library, agents and FAQ sections.
-
-The ZIP is the current signed development build, not a notarized production release. No waitlist or hosted deployment is configured.
 
 ## Assets
 
@@ -80,13 +78,3 @@ The ZIP is the current signed development build, not a notarized production rele
   - Library search, source filtering and the arrival animation.
   - The agent session.
 - No horizontal overflow and no console errors.
-
-## Package the download
-
-From the repository root:
-
-```sh
-./scripts/package-download.sh
-```
-
-This builds and signs Refs using the existing signing workflow, then writes the app ZIP to `landing/public/downloads/`, which Astro copies into `dist/downloads/`. The generated binary folder is ignored by Git; run the packaging script before building or deploying the site.

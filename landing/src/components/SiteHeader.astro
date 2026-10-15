@@ -1,7 +1,7 @@
 ---
 import Download from '../assets/icons/download.svg';
 import logo from '../assets/brand/refs-light.svg';
-import { downloadName, downloadUrl, githubUrl } from '../lib/links';
+import { downloadUrl, githubUrl } from '../lib/links';
 
 const sections = [
   { href: '#workflow', label: 'How it works' },
@@ -18,7 +18,7 @@ const sections = [
     </nav>
     <div class="header-actions">
       <a class="github-link" href={githubUrl}><span class="gh-mark" aria-hidden="true"></span><span class="github-label">GitHub</span></a>
-      <a class="nav-cta" href={downloadUrl} download={downloadName}>Download <Download width={16} height={16} aria-hidden="true" /></a>
+      <a class="nav-cta" href={downloadUrl}>Download <Download width={16} height={16} aria-hidden="true" /></a>
     </div>
   </div>
 </header>

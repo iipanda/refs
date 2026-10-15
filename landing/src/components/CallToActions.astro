@@ -1,12 +1,12 @@
 ---
 import Download from '../assets/icons/download.svg';
-import { downloadName, downloadUrl, githubUrl } from '../lib/links';
+import { downloadUrl, githubUrl } from '../lib/links';
 
 interface Props { iconSize?: number; class?: string; }
 const { iconSize = 20, class: className } = Astro.props;
 ---
 <div class:list={['actions', className]}>
-  <a class="button button-yellow" href={downloadUrl} download={downloadName}>Download for Mac <Download width={iconSize} height={iconSize} aria-hidden="true" /></a>
+  <a class="button button-yellow" href={downloadUrl}>Download for Mac <Download width={iconSize} height={iconSize} aria-hidden="true" /></a>
   <a class="button button-ghost" href={githubUrl}><span class="gh-mark" aria-hidden="true"></span>View on GitHub</a>
 </div>
 

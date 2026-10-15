@@ -37,9 +37,9 @@ A good layout, a quiet color palette, a small interaction that feels right. Refs
 
 ## Get started
 
-The [website](https://refs-76w.pages.dev) has the current Mac download. You can also [build Refs from source](docs/development.md).
+Download the [latest DMG](https://github.com/iipanda/refs/releases/latest/download/Refs-macOS.dmg). You can also [build Refs from source](docs/development.md).
 
-1. Move **Refs.app** into **Applications** and open it.
+1. Open the DMG, drag **Refs** into **Applications** and open it.
 2. Follow setup to allow **Screen Recording**, then quit and reopen Refs. Allow browser **Automation** to save website URLs and titles.
 3. Capture something, add what you like about it, and press **Return**.
 
@@ -53,7 +53,7 @@ The [website](https://refs-76w.pages.dev) has the current Mac download. You can 
 
 Shortcuts are configurable. If **⌘⇧3** takes a full-screen screenshot instead, change that shortcut in macOS or Refs.
 
-The current download is a signed development build, not a notarized release. [More about capture, permissions, tags, and storage →](docs/usage.md)
+[More about capture, permissions, tags, and storage →](docs/usage.md)
 
 ## Bring your references to your agent
 

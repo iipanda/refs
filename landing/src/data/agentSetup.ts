@@ -1,12 +1,10 @@
+import { downloadUrl } from '../lib/links';
+
 export const helperPath = '/Applications/Refs.app/Contents/MacOS/refs-mcp';
 
-/** Replaced in the browser with the absolute URL of the download on the current site. */
-export const downloadToken = '{download-url}';
-
 // The connect step matches Settings › Agents in the app (Sources/Refs/Settings/SettingsView.swift).
-// curl leaves no quarantine flag, so the development build opens without a Gatekeeper prompt.
 export const setupPrompt = `Set up Refs, a Mac app for saving UI references, and connect it to this agent:
-1. If /Applications/Refs.app doesn't exist, download ${downloadToken} with curl, unzip it, move Refs.app to /Applications and open it.
+1. If /Applications/Refs.app doesn't exist, download ${downloadUrl} with curl -fL, mount the DMG with hdiutil, copy Refs.app to /Applications, eject the disk image and open Refs.
 2. Add a stdio MCP server named "refs" that runs ${helperPath} with no arguments to your user-level config, keeping existing servers.
 3. Call get_library_info to confirm it works, or tell me if you need a restart.`;
 
