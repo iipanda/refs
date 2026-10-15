@@ -12,7 +12,7 @@
   </div>
   <div class="sp-source">
     <span class="app-icon tile-browser">{@html macIcons.globe}</span>
-    <div><b>Objects — forme.</b><small>forme.example/objects · Safari</small></div>
+    <div><b>Objects | forme.</b><small>forme.example/objects · Safari</small></div>
     <span class="sp-edit">Edit</span>
   </div>
   <div class="sp-note" data-placeholder="What do you like about it?"><span class="sp-typed">{note}</span><i class="caret" aria-hidden="true"></i></div>
