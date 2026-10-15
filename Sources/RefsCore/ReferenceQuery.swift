@@ -1,30 +1,40 @@
 import Foundation
 
-/// Filters references by free text, app and website. All given criteria must match.
+/// Filters references by free text, app, website and tag. All given criteria must match.
 public struct ReferenceQuery: Sendable {
     public var text: String?
     /// App name or bundle ID, case-insensitive.
     public var app: String?
     /// Website host such as `stripe.com`; subdomains match too (`dashboard.stripe.com`).
     public var site: String?
+    /// Stable tag ID or case-insensitive tag name.
+    public var tag: String?
     public var limit: Int?
 
-    public init(text: String? = nil, app: String? = nil, site: String? = nil, limit: Int? = nil) {
+    public init(text: String? = nil, app: String? = nil, site: String? = nil, tag: String? = nil, limit: Int? = nil) {
         self.text = text
         self.app = app
         self.site = site
+        self.tag = tag
         self.limit = limit
     }
 
-    public func apply(to refs: [Reference]) -> [Reference] {
+    public func apply(to refs: [Reference], tags: [LibraryTag] = []) -> [Reference] {
         let tokens = (text ?? "")
             .lowercased()
             .split(whereSeparator: \.isWhitespace)
             .map(String.init)
         let appNeedle = app?.trimmingCharacters(in: .whitespaces).lowercased()
         let siteNeedle = site.flatMap(WebSource.normalizedHost)
+        let tagNeedle = tag?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let matchingTagID = tagNeedle.flatMap { needle in
+            tags.first { $0.id == needle }?.id ??
+                tags.first { $0.name.caseInsensitiveCompare(needle) == .orderedSame }?.id ?? needle
+        }
+        let tagNames = Dictionary(tags.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
 
         let matched = refs.filter { ref in
+            if let matchingTagID, !matchingTagID.isEmpty, !ref.tagIDs.contains(matchingTagID) { return false }
             if let appNeedle, !appNeedle.isEmpty {
                 let name = ref.app.name.lowercased()
                 let bundle = ref.app.bundleID?.lowercased()
@@ -36,7 +46,7 @@ public struct ReferenceQuery: Sendable {
                 else { return false }
             }
             if !tokens.isEmpty {
-                let haystack = Self.searchableText(ref)
+                let haystack = Self.searchableText(ref) + "\n" + ref.tagIDs.compactMap { tagNames[$0] }.joined(separator: "\n").lowercased()
                 guard tokens.allSatisfy(haystack.contains) else { return false }
             }
             return true

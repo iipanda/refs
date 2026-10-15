@@ -16,7 +16,9 @@ enum ToolValidation {
         case "null": guard value is NSNull else { throw invalid() }
         case "string":
             guard let string = value as? String else { throw invalid() }
-            if let choices = schema["enum"] as? [String], !choices.contains(string) { throw invalid() }
+            if let choices = schema["enum"] as? [String], !choices.contains(string) {
+                throw LibraryError.invalidInput("Invalid value for \(path). Expected one of: \(choices.joined(separator: ", ")).")
+            }
             if let minimum = schema["minLength"] as? Int, string.count < minimum { throw invalid() }
         case "boolean":
             guard let n = value as? NSNumber, CFGetTypeID(n) == CFBooleanGetTypeID() else { throw invalid() }

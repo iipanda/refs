@@ -5,6 +5,7 @@ import RefsCore
 final class LibraryModel: ObservableObject {
     @Published private(set) var refs: [Reference] = []
     @Published private(set) var trashRefs: [Reference] = []
+    @Published private(set) var tags: [LibraryTag] = []
     @Published var libraryError: String?
     private var watcher: LibraryWatcher?
     struct NoteDraft { var note: String; var revision: Int }
@@ -61,10 +62,13 @@ final class LibraryModel: ObservableObject {
     func reload() {
         do {
             let all = try store.readAll(includeTrashed: true)
+            let currentTags = try store.readTags()
             let active = all.filter { !$0.isTrashed }
             let trash = all.filter(\.isTrashed)
             if refs != active { refs = active }
             if trashRefs != trash { trashRefs = trash }
+            if tags != currentTags { tags = currentTags }
+            selection.retain(all.map(\.id))
             loadFavicons()
         } catch { libraryError = error.localizedDescription }
     }
@@ -99,6 +103,75 @@ final class LibraryModel: ObservableObject {
         return (refs + trashRefs).first { $0.id == id }
     }
 
+    func tags(for ref: Reference) -> [LibraryTag] {
+        let ids = Set(ref.tagIDs)
+        return tags.filter { ids.contains($0.id) }
+    }
+
+    func tagReferenceCount(_ tag: LibraryTag, includeTrashed: Bool = false) -> Int {
+        let references = includeTrashed ? refs + trashRefs : refs
+        return references.filter { $0.tagIDs.contains(tag.id) }.count
+    }
+
+    @discardableResult
+    func createTag(name: String, color: TagColor? = nil, on refs: [Reference] = []) throws -> LibraryTag {
+        do {
+            let tag = try store.createTag(name: name, color: color)
+            reload()
+            if !refs.isEmpty { setTag(tag, on: refs, adding: true) }
+            return tag
+        } catch {
+            reload()
+            throw error
+        }
+    }
+
+    @discardableResult
+    func updateTag(_ tag: LibraryTag, name: String? = nil, color: TagColor? = nil) -> Bool {
+        do {
+            _ = try store.updateTag(id: tag.id, name: name, color: color, expectedRevision: tag.revision)
+            reload()
+            return true
+        } catch {
+            reload()
+            libraryError = error.localizedDescription
+            return false
+        }
+    }
+
+    @discardableResult
+    func deleteTag(_ tag: LibraryTag) -> Bool {
+        do {
+            _ = try store.deleteTag(id: tag.id, expectedRevision: tag.revision)
+            reload()
+            return true
+        } catch {
+            reload()
+            libraryError = error.localizedDescription
+            return false
+        }
+    }
+
+    /// Each snapshot supplies its own revision, so a concurrent agent edit is never overwritten.
+    /// Other selected references still succeed if one has changed or disappeared.
+    func setTag(_ tag: LibraryTag, on refs: [Reference], adding: Bool) {
+        var failures: [String] = []
+        var updated = 0
+        for ref in refs {
+            do {
+                _ = try store.setTags(id: ref.id, tagIDs: [tag.id], adding: adding, expectedRevision: ref.revision)
+                updated += 1
+            } catch {
+                failures.append("\(ref.sourceLabel) (\(ref.id)): \(error.localizedDescription)")
+            }
+        }
+        reload()
+        if !failures.isEmpty {
+            let action = adding ? "added to" : "removed from"
+            libraryError = "\"\(tag.name)\" was \(action) \(updated) of \(refs.count) references.\n\n" + failures.joined(separator: "\n")
+        }
+    }
+
     func add(_ draft: SaveDraft) throws -> Reference {
         let capture = draft.capture
         guard let png = ImageCoding.pngData(from: capture.image, scale: capture.scale) else {
@@ -116,9 +189,12 @@ final class LibraryModel: ObservableObject {
             videoURL: capture.videoURL,
             duration: capture.videoDuration
         )
-        refs.insert(ref, at: 0)
+        // Tags apply as a follow-up write; a tag deleted meanwhile must not lose the capture.
+        let tagged = draft.tagIDs.isEmpty ? ref
+            : (try? store.setTags(id: ref.id, tagIDs: draft.tagIDs.filter { id in tags.contains { $0.id == id } }, adding: true)) ?? ref
+        refs.insert(tagged, at: 0)
         loadFavicons()
-        return ref
+        return tagged
     }
 
     @discardableResult
@@ -176,6 +252,8 @@ final class LibraryModel: ObservableObject {
         }
         if let title = ref.title { parts.append("title: \(title)") }
         if !ref.note.isEmpty { parts.append("what I like: \(ref.note)") }
+        let tagNames = tags(for: ref).map(\.name)
+        if !tagNames.isEmpty { parts.append("tags: " + tagNames.joined(separator: ", ")) }
         parts.append("\(ref.isVideo ? "video" : "image"): \(mediaURL(for: ref).path)")
         return parts.joined(separator: "\n")
     }

@@ -11,6 +11,8 @@ final class SaveDraft: ObservableObject {
     @Published var title: String
     @Published var url: String
     @Published var note = ""
+    /// Applied right after the reference is saved.
+    @Published var tagIDs: [String] = []
     @Published var browserAccess: BrowserAccess?
     @Published var askingPermission = false
 
@@ -76,7 +78,7 @@ final class SavePanelController: NSObject, NSWindowDelegate {
     private let onFinish: (SaveDraft?) -> Void
     private var done = false
 
-    init(capture: CaptureResult, onFinish: @escaping (SaveDraft?) -> Void) {
+    init(capture: CaptureResult, library: LibraryModel? = nil, onFinish: @escaping (SaveDraft?) -> Void) {
         draft = SaveDraft(capture: capture)
         self.onFinish = onFinish
         panel = KeyablePanel(contentRect: NSRect(x: 0, y: 0, width: 400, height: 380),
@@ -97,7 +99,7 @@ final class SavePanelController: NSObject, NSWindowDelegate {
         panel.standardWindowButton(.zoomButton)?.isHidden = true
         panel.delegate = self
 
-        let view = SaveView(draft: draft, onSave: { [weak self] in self?.finish(save: true) },
+        let view = SaveView(draft: draft, library: library, onSave: { [weak self] in self?.finish(save: true) },
                             onDiscard: { [weak self] in self?.finish(save: false) })
         let hosting = NSHostingView(rootView: view)
         panel.contentView = hosting
@@ -147,6 +149,7 @@ private final class KeyablePanel: NSPanel {
 
 struct SaveView: View {
     @ObservedObject var draft: SaveDraft
+    var library: LibraryModel?
     let onSave: () -> Void
     let onDiscard: () -> Void
     @State private var editingSource = false
@@ -175,6 +178,8 @@ struct SaveView: View {
                 .font(.body)
                 .focused($noteFocused)
                 .onSubmit(onSave)
+
+            if let library { SaveTagRow(draft: draft, library: library) }
 
             HStack {
                 Text("Return to save · Esc to discard")
@@ -337,5 +342,26 @@ struct MoviePreview: NSViewRepresentable {
     static func dismantleNSView(_ view: AVPlayerView, coordinator: ()) {
         view.player?.pause()
         view.player = nil
+    }
+}
+
+/// Optional tags for the new reference. The picker never takes Return away from saving the note.
+private struct SaveTagRow: View {
+    @ObservedObject var draft: SaveDraft
+    @ObservedObject var library: LibraryModel
+
+    var body: some View {
+        TagField(
+            tags: library.tags,
+            coverage: { draft.tagIDs.contains($0.id) ? .all : .none },
+            toggle: { tag in
+                if let index = draft.tagIDs.firstIndex(of: tag.id) { draft.tagIDs.remove(at: index) }
+                else { draft.tagIDs.append(tag.id) }
+            },
+            applyToAll: { tag in if !draft.tagIDs.contains(tag.id) { draft.tagIDs.append(tag.id) } },
+            remove: { tag in draft.tagIDs.removeAll { $0 == tag.id } },
+            create: { draft.tagIDs.append(try library.createTag(name: $0).id) })
+        // Tags deleted elsewhere while the panel is open are dropped before saving.
+        .onChange(of: library.tags.map(\.id)) { _, ids in draft.tagIDs.removeAll { !ids.contains($0) } }
     }
 }

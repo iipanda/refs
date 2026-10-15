@@ -7,6 +7,7 @@ enum SidebarItem: Hashable {
     case all, recent, trash
     case app(String)
     case site(String)
+    case tag(String)
 }
 
 struct LibraryView: View {
@@ -15,17 +16,23 @@ struct LibraryView: View {
     var openSettings: () -> Void = {}
     @State private var sidebar: SidebarItem? = .all
     @State private var search = ""
+    @State private var renamingTag: LibraryTag?
+    @State private var tagName = ""
+    @State private var deletingTag: LibraryTag?
+    @State private var tagDeletionCount = 0
+    /// References to tag once a tag named in the New Tag alert is created; empty from the sidebar.
+    @State private var newTagTargets: [Reference]?
+    @State private var newTagName = ""
 
     var body: some View {
         NavigationSplitView {
-            sidebarList
-                .safeAreaInset(edge: .bottom, spacing: 0) { settingsButton }
+            sidebarContent
                 .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
         } detail: {
             grid
                 // Attached to the grid, not the split view, so it stays in the grid's part of the
                 // toolbar and moves aside when the details panel opens instead of covering it.
-                .searchable(text: $search, placement: .toolbar, prompt: "Search notes, sites, apps")
+                .searchable(text: $search, placement: .toolbar, prompt: "Search notes, sites, apps, tags")
                 // The details panel only exists while something is selected.
                 .inspector(isPresented: inspectorPresented) {
                     Group {
@@ -48,6 +55,40 @@ struct LibraryView: View {
             // Switching sections or searching drops selected cards that are no longer shown.
             model.selection.retain(ids)
         }
+        .onChange(of: model.tags.map(\.id)) { _, ids in
+            if case .tag(let id) = sidebar, !ids.contains(id) { sidebar = .all }
+        }
+        .alert("New Tag", isPresented: newTagPresented) {
+            TextField("Tag name", text: $newTagName)
+            Button("Cancel", role: .cancel) { newTagTargets = nil }
+            Button("Create") {
+                do { try model.createTag(name: newTagName, on: newTagTargets ?? []) }
+                catch { model.libraryError = error.localizedDescription }
+                newTagTargets = nil
+            }
+            .disabled(newTagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        } message: {
+            Text(newTagMessage)
+        }
+        .alert("Rename Tag", isPresented: renamingTagPresented) {
+            TextField("Tag name", text: $tagName)
+            Button("Cancel", role: .cancel) { renamingTag = nil }
+            Button("Rename") {
+                if let tag = renamingTag { model.updateTag(tag, name: tagName) }
+                renamingTag = nil
+            }
+            .disabled(tagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        } message: {
+            Text("The new name appears on every reference with this tag.")
+        }
+        .confirmationDialog(tagDeletionTitle, isPresented: deletingTagPresented, titleVisibility: .visible) {
+            Button("Delete Tag", role: .destructive) {
+                if let tag = deletingTag { model.deleteTag(tag) }
+                deletingTag = nil
+            }
+        } message: {
+            Text("This tag will be removed from \(tagDeletionCount) reference\(tagDeletionCount == 1 ? "" : "s"), including those in Trash. The references themselves will not be deleted.")
+        }
         .confirmationDialog(deletionTitle, isPresented: deletionPresented) {
             Button("Move to Trash", role: .destructive) {
                 model.delete(ids: Set(model.pendingDeletion.map(\.id)))
@@ -57,6 +98,42 @@ struct LibraryView: View {
             Text(model.pendingDeletion.count == 1
                  ? "The capture and its note can be restored from Trash."
                  : "The captures and their notes can be restored from Trash.")
+        }
+    }
+
+    private var newTagPresented: Binding<Bool> {
+        Binding(get: { newTagTargets != nil }, set: { if !$0 { newTagTargets = nil } })
+    }
+
+    private var newTagMessage: String {
+        let count = newTagTargets?.count ?? 0
+        return count == 0 ? "A color is picked automatically. You can change it from the sidebar."
+            : "It will be added to \(count == 1 ? "this reference" : "the \(count) selected references")."
+    }
+
+    private func requestNewTag(on refs: [Reference]) {
+        newTagName = ""
+        newTagTargets = refs
+    }
+
+    private var renamingTagPresented: Binding<Bool> {
+        Binding(get: { renamingTag != nil }, set: { if !$0 { renamingTag = nil } })
+    }
+
+    private var deletingTagPresented: Binding<Bool> {
+        Binding(get: { deletingTag != nil }, set: { if !$0 { deletingTag = nil } })
+    }
+
+    private var tagDeletionTitle: String {
+        deletingTag.map { "Delete \"\($0.name)\"?" } ?? "Delete Tag?"
+    }
+
+    private func requestTagDeletion(_ tag: LibraryTag) {
+        do {
+            tagDeletionCount = try model.store.tagReferenceCount(id: tag.id, includeTrashed: true)
+            deletingTag = tag
+        } catch {
+            model.libraryError = error.localizedDescription
         }
     }
 
@@ -90,17 +167,35 @@ struct LibraryView: View {
 
     // MARK: Sidebar
 
-    /// Pinned below the sidebar's list, like the account or settings row in other Mac sidebars.
+    @ViewBuilder
+    private var sidebarContent: some View {
+        if #available(macOS 26, *) {
+            sidebarList
+                .scrollEdgeEffectStyle(.soft, for: .bottom)
+                .safeAreaBar(edge: .bottom, spacing: 0) {
+                    settingsButton
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+        } else {
+            VStack(spacing: 0) {
+                sidebarList
+                settingsButton
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    /// Pinned controls share the list's native scroll-edge blur on macOS 26.
     private var settingsButton: some View {
         Button(action: openSettings) {
             Label("Settings", systemImage: "gearshape")
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 18)
-        .padding(.vertical, 12)
+        .foregroundStyle(.primary)
         .help("Settings (⌘,)")
     }
 
@@ -132,6 +227,36 @@ struct LibraryView: View {
                     }
                 }
             }
+            Section {
+                ForEach(model.tags) { tag in
+                    Label { Text(tag.name).lineLimit(1) } icon: { TagDot(tag: tag, size: 9) }
+                        .badge(Text("\(model.tagReferenceCount(tag))"))
+                        .tag(SidebarItem.tag(tag.id))
+                        .help(tag.name)
+                        .contextMenu {
+                            Button("Rename…") {
+                                tagName = tag.name
+                                renamingTag = tag
+                            }
+                            Menu("Color") {
+                                TagColorMenuItems(selected: tag.color) { model.updateTag(tag, color: $0) }
+                            }
+                            Divider()
+                            Button("Delete…", role: .destructive) { requestTagDeletion(tag) }
+                        }
+                }
+            } header: {
+                HStack {
+                    Text("Tags")
+                    Spacer()
+                    Button { requestNewTag(on: []) } label: {
+                        Image(systemName: "plus").font(.system(size: 11, weight: .semibold))
+                    }
+                    .buttonStyle(.borderless)
+                    .help("New Tag")
+                    .accessibilityLabel("New tag")
+                }
+            }
         }
     }
 
@@ -150,8 +275,9 @@ struct LibraryView: View {
         case .trash: refs = model.trashRefs
         case .app(let key): refs = model.refs.filter { $0.web == nil && ($0.app.bundleID ?? $0.app.name) == key }
         case .site(let host): refs = model.refs.filter { $0.web?.host == host }
+        case .tag(let id): refs = model.refs.filter { $0.tagIDs.contains(id) }
         }
-        return ReferenceQuery(text: search).apply(to: refs)
+        return ReferenceQuery(text: search).apply(to: refs, tags: model.tags)
     }
 
     private var grid: some View {
@@ -179,6 +305,7 @@ struct LibraryView: View {
         case .trash: "Trash"
         case .app(let key): model.refs.first { ($0.app.bundleID ?? $0.app.name) == key }?.app.name ?? key
         case .site(let host): host
+        case .tag(let id): model.tags.first { $0.id == id }?.name ?? "Tag"
         }
     }
 
@@ -212,6 +339,7 @@ struct LibraryView: View {
         }
         Button("Copy" + suffix) { copy(model.referenceText(for: targets)) }
         Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting(targets.map(model.mediaURL(for:))) }
+        TagSelectionMenu(model: model, refs: targets) { requestNewTag(on: targets) }
         Divider()
         if ref.isTrashed {
             Button("Restore" + suffix) { model.restore(ids: Set(targets.map(\.id))) }
@@ -266,6 +394,7 @@ struct ReferenceGrid: View {
                     ForEach(refs) { ref in
                         ReferenceCard(ref: ref, imageURL: model.store.imageURL(for: ref),
                                       selected: model.selection.contains(ref.id),
+                                      tags: model.tags(for: ref),
                                       favicon: { model.favicons[$0] })
                             .frame(width: layout.cardWidth)
                             .background {
@@ -447,6 +576,7 @@ struct ReferenceCard: View {
     let ref: Reference
     let imageURL: URL
     let selected: Bool
+    var tags: [LibraryTag] = []
     var favicon: (String) -> NSImage? = { _ in nil }
     @State private var image: NSImage?
 
@@ -480,6 +610,8 @@ struct ReferenceCard: View {
                 Text(ref.sourceLabel)
                     .font(.callout.weight(.medium))
                     .lineLimit(1)
+                Spacer(minLength: 2)
+                TagDots(tags: tags)
             }
             Text(ref.note.isEmpty ? (ref.title ?? "No note") : ref.note)
                 .font(.caption)
@@ -553,6 +685,8 @@ struct InspectorView: View {
                     }
                 }
                 .font(.callout)
+
+                TagSection(model: model, refs: [ref])
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text("What I like")
@@ -630,45 +764,50 @@ struct BulkInspectorView: View {
     let refs: [Reference]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            ZStack {
-                ForEach(Array(refs.prefix(3).enumerated().reversed()), id: \.element.id) { index, ref in
-                    StackedThumbnail(url: model.store.imageURL(for: ref))
-                        .rotationEffect(.degrees(Double(index) * -4))
-                        .offset(x: CGFloat(index) * -10, y: CGFloat(index) * -6)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                ZStack {
+                    ForEach(Array(refs.prefix(3).enumerated().reversed()), id: \.element.id) { index, ref in
+                        StackedThumbnail(url: model.store.imageURL(for: ref))
+                            .rotationEffect(.degrees(Double(index) * -4))
+                            .offset(x: CGFloat(index) * -10, y: CGFloat(index) * -6)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 170)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(refs.count) references selected")
+                        .font(.headline)
+                    Text(sources)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Button("Copy \(refs.count) References") { copy(model.referenceText(for: refs)) }
+                        .help("Copy ids, sources, notes and file paths, for pasting into an agent prompt")
+                    Button("Reveal in Finder") {
+                        NSWorkspace.shared.activateFileViewerSelecting(refs.map(model.mediaURL(for:)))
+                    }
+                    Button("Deselect All") { model.selection.clear() }
+                }
+                .controlSize(.small)
+
+                TagSection(model: model, refs: refs)
+
+                Spacer(minLength: 12)
+
+                if refs.allSatisfy(\.isTrashed) {
+                    Button("Restore \(refs.count) References") { model.restore(ids: Set(refs.map(\.id))) }.controlSize(.small)
+                } else {
+                    Button("Move \(refs.count) References to Trash…", role: .destructive) { model.requestDeletion(of: refs) }.controlSize(.small)
                 }
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 170)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(refs.count) references selected")
-                    .font(.headline)
-                Text(sources)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(3)
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Button("Copy \(refs.count) References") { copy(model.referenceText(for: refs)) }
-                    .help("Copy ids, sources, notes and file paths, for pasting into an agent prompt")
-                Button("Reveal in Finder") {
-                    NSWorkspace.shared.activateFileViewerSelecting(refs.map(model.mediaURL(for:)))
-                }
-                Button("Deselect All") { model.selection.clear() }
-            }
-            .controlSize(.small)
-
-            Spacer()
-
-            if refs.allSatisfy(\.isTrashed) {
-                Button("Restore \(refs.count) References") { model.restore(ids: Set(refs.map(\.id))) }.controlSize(.small)
-            } else {
-                Button("Move \(refs.count) References to Trash…", role: .destructive) { model.requestDeletion(of: refs) }.controlSize(.small)
-            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(16)
     }
 
     /// e.g. "stripe.com, Linear and 2 more".

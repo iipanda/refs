@@ -393,7 +393,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             restoreFocus()
             showError("Couldn't capture", error.localizedDescription)
         case .success(let capture):
-            let panel = SavePanelController(capture: capture) { [weak self] draft in
+            let panel = SavePanelController(capture: capture, library: library) { [weak self] draft in
                 guard let self else { return }
                 savePanel = nil
                 if let draft {
@@ -595,7 +595,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                 browserAccess: BrowserSupport.browser(bundleID: "com.google.Chrome").map { .needsPermission($0) },
                 frame: NSRect(x: 100, y: 200, width: 600, height: 300), sourceWindow: nil,
                 sourceWindowIsFrontmostOfApp: false)
-            let panel = SavePanelController(capture: capture) { _ in }
+            let panel = SavePanelController(capture: capture, library: library) { _ in }
             savePanel = panel
             panel.show()
         }

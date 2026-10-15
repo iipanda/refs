@@ -13,6 +13,12 @@ public struct Reference: Codable, Identifiable, Hashable, Sendable {
     public var fingerprint: String?
     public var provenance: ReferenceProvenance?
     public var trashedAt: Date?
+    private var savedTagIDs: [String]?
+    /// Stable IDs in the library's tag catalog. Missing on older sidecars.
+    public var tagIDs: [String] {
+        get { savedTagIDs ?? [] }
+        set { savedTagIDs = newValue }
+    }
     private var savedRevision: Int?
     public var revision: Int {
         get { savedRevision ?? 1 }
@@ -41,7 +47,8 @@ public struct Reference: Codable, Identifiable, Hashable, Sendable {
         web: WebSource? = nil,
         note: String = "",
         videoFile: String? = nil,
-        duration: Double? = nil
+        duration: Double? = nil,
+        tagIDs: [String] = []
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -54,11 +61,13 @@ public struct Reference: Codable, Identifiable, Hashable, Sendable {
         self.note = note
         self.videoFile = videoFile
         self.duration = duration
+        self.savedTagIDs = tagIDs
     }
 
     enum CodingKeys: String, CodingKey {
         case videoFile, duration, customTitle, fingerprint, provenance, trashedAt
         case savedRevision = "revision"
+        case savedTagIDs = "tagIDs"
         case id, createdAt, imageFile, pixelWidth, pixelHeight, app, windowTitle, web
         case note = "description"
     }

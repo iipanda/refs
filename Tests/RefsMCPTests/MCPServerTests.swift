@@ -96,14 +96,14 @@ private func text(_ result: [String: Any]) -> String {
         #expect((parsed["error"] as? [String: Any])?["code"] as? Int == -32700)
     }
 
-    @Test func toolsListHasEightCorrectlyAnnotatedTools() async throws {
+    @Test func toolsListHasCorrectlyAnnotatedTools() async throws {
         let (store, _, _) = try makeStore()
         let response = try #require(try await send(MCPServer(store: store), ["jsonrpc": "2.0", "id": 2, "method": "tools/list"]))
         let tools = try #require((response["result"] as? [String: Any])?["tools"] as? [[String: Any]])
-        #expect(tools.compactMap { $0["name"] as? String } == ["list_references", "get_reference", "list_sources", "get_library_info", "add_references", "update_reference", "trash_references", "restore_references"])
+        #expect(tools.compactMap { $0["name"] as? String } == ["list_references", "get_reference", "list_sources", "get_library_info", "list_tags", "create_tag", "update_tag", "delete_tag", "tag_references", "untag_references", "add_references", "update_reference", "trash_references", "restore_references"])
         for tool in tools {
             #expect((tool["inputSchema"] as? [String: Any])?["type"] as? String == "object")
-            let read = ["list_references", "get_reference", "list_sources", "get_library_info"].contains(tool["name"] as? String ?? "")
+            let read = ["list_references", "get_reference", "list_sources", "get_library_info", "list_tags"].contains(tool["name"] as? String ?? "")
             #expect((tool["annotations"] as? [String: Any])?["readOnlyHint"] as? Bool == read)
         }
     }

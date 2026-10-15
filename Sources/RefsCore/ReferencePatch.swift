@@ -45,11 +45,15 @@ public struct ReferencePatch: Sendable {
 
 public enum LibraryError: LocalizedError {
     case invalidInput(String), notFound(String), conflict(Reference)
+    case unknownTag(String), duplicateTagName(String), tagConflict(LibraryTag)
     public var errorDescription: String? {
         switch self {
         case .invalidInput(let message): return message
         case .notFound(let id): return "No reference with id \(id)."
         case .conflict(let ref): return "Reference \(ref.id) changed. Current revision is \(ref.revision); read it again before updating."
+        case .unknownTag(let id): return "No tag with id \(id)."
+        case .duplicateTagName(let name): return "A tag named \"\(name)\" already exists. Tag names must be unique regardless of case."
+        case .tagConflict(let tag): return "Tag \(tag.id) changed. Current revision is \(tag.revision); read it again before updating."
         }
     }
 }
