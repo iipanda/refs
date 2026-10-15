@@ -85,6 +85,11 @@ open build/Refs.app
 
 [Build, signing, icon sources, and repository layout →](docs/development.md)
 
+## License
+
+Refs is licensed under the [GNU Affero General Public License v3.0](LICENSE) (`AGPL-3.0-only`).
+Third-party components and assets retain their respective licenses and notices.
+
 ---
 
 <p align="center">
